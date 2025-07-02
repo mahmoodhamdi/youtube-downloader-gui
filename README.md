@@ -2,7 +2,7 @@
 
 A comprehensive GUI application for downloading YouTube videos and playlists with advanced features including quality selection, subtitle support, batch processing, and background execution.
 
-![Python](https://img.shields.io/badge/python-v3.8+-blue.svg)
+![Python](https://img.shields.io/badge/python-v3.13.1+-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 ![Platform](https://img.shields.io/badge/platform-Windows%20|%20macOS%20|%20Linux-lightgrey.svg)
 
@@ -22,7 +22,8 @@ A comprehensive GUI application for downloading YouTube videos and playlists wit
 ## Screenshots 📸
 
 ### Main Interface
-```
+
+```wireframe
 ┌─────────────────────────────────────────────────────────────────┐
 │                     YouTube Downloader Pro                      │
 ├─────────────────────────────────────────────────────────────────┤
@@ -68,12 +69,14 @@ A comprehensive GUI application for downloading YouTube videos and playlists wit
 ### Option 1: Run from Source
 
 1. **Clone the repository**:
+
    ```bash
-   git clone https://github.com/your-username/youtube-downloader-gui.git
+   git clone https://github.com/mahmoodhamdi/youtube-downloader-gui.git
    cd youtube-downloader-gui
    ```
 
 2. **Create a virtual environment**:
+
    ```bash
    python -m venv venv
    
@@ -85,11 +88,13 @@ A comprehensive GUI application for downloading YouTube videos and playlists wit
    ```
 
 3. **Install dependencies**:
+
    ```bash
    pip install -r requirements.txt
    ```
 
 4. **Run the application**:
+
    ```bash
    python youtube_downloader.py
    ```
@@ -107,9 +112,11 @@ A comprehensive GUI application for downloading YouTube videos and playlists wit
 
 1. Follow steps 1-3 from "Run from Source"
 2. Run the build script:
+
    ```bash
    python build.py
    ```
+
 3. Find the executable in the `dist` folder
 
 ## Usage Guide 📖
@@ -210,7 +217,8 @@ Thanks to `yt-dlp`, this application supports downloading from:
 ## Development 💻
 
 ### Project Structure
-```
+
+```structure
 youtube-downloader-gui/
 ├── youtube_downloader.py      # Main application
 ├── requirements.txt           # Dependencies
@@ -266,4 +274,4 @@ This tool is for personal use only. Please respect copyright laws and YouTube's 
 
 ---
 
-**Made with ❤️ by the YouTube Downloader Team**
+**Made with ❤️ by the Mahmood Hamdi**
