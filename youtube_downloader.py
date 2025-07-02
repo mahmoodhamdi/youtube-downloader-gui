@@ -1,10 +1,3 @@
-#!/usr/bin/env python3
-"""
-YouTube Downloader GUI Application
-A comprehensive GUI application for downloading YouTube videos and playlists
-with quality selection, subtitle support, and batch processing.
-"""
-
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox, scrolledtext
 import threading
