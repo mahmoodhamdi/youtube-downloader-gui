@@ -1,0 +1,8 @@
+# YouTube Downloader GUI Requirements
+yt-dlp
+tkinter
+pyinstaller
+requests
+urllib3
+certifi
+pillow
