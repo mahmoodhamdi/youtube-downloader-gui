@@ -5,9 +5,10 @@ import queue
 import os
 import json
 import sys
+import re
+import subprocess
 from pathlib import Path
 import yt_dlp
-import re
 from urllib.parse import urlparse, parse_qs
 from datetime import datetime
 
@@ -64,6 +65,10 @@ class YouTubeDownloaderGUI:
         """Save configuration to file"""
         try:
             self.config["window_geometry"] = self.root.geometry()
+            self.config["download_path"] = self.path_var.get()
+            self.config["quality"] = self.quality_var.get()
+            self.config["include_subtitles"] = self.subtitle_var.get()
+            self.config["subtitle_langs"] = [lang.strip() for lang in self.subtitle_langs_var.get().split(',') if lang.strip()]
             with open(self.config_file, 'w') as f:
                 json.dump(self.config, f, indent=2)
         except Exception as e:
@@ -140,6 +145,10 @@ class YouTubeDownloaderGUI:
         
         multi_add_button = ttk.Button(url_frame, text="Add All", command=self.add_multiple_urls)
         multi_add_button.grid(row=1, column=2, sticky=(tk.N), pady=(10, 0), padx=(5, 0))
+        
+        # Extracting progress label
+        self.extracting_label = ttk.Label(url_frame, text="", style="Status.TLabel")
+        self.extracting_label.grid(row=2, column=0, columnspan=3, sticky=tk.W, pady=(5, 0))
     
     def setup_settings_section(self, parent, row):
         """Setup settings section"""
@@ -157,6 +166,9 @@ class YouTubeDownloaderGUI:
         browse_button = ttk.Button(settings_frame, text="Browse", command=self.browse_download_path)
         browse_button.grid(row=0, column=2, padx=(5, 0))
         
+        open_folder_button = ttk.Button(settings_frame, text="Open Folder", command=self.open_download_folder)
+        open_folder_button.grid(row=0, column=3, padx=(5, 0))
+        
         # Quality selection
         ttk.Label(settings_frame, text="Quality:").grid(row=1, column=0, sticky=tk.W, pady=(10, 0), padx=(0, 5))
         
@@ -171,6 +183,12 @@ class YouTubeDownloaderGUI:
         subtitle_check = ttk.Checkbutton(settings_frame, text="Download Subtitles", 
                                        variable=self.subtitle_var)
         subtitle_check.grid(row=1, column=2, pady=(10, 0), padx=(5, 0))
+        
+        # Subtitle languages
+        ttk.Label(settings_frame, text="Subtitle Languages:").grid(row=2, column=0, sticky=tk.W, pady=(5, 0), padx=(0, 5))
+        self.subtitle_langs_var = tk.StringVar(value=",".join(self.config.get('subtitle_langs', ['en'])))
+        subtitle_langs_entry = ttk.Entry(settings_frame, textvariable=self.subtitle_langs_var, width=20)
+        subtitle_langs_entry.grid(row=2, column=1, sticky=tk.W, pady=(5, 0), padx=(0, 5))
     
     def setup_queue_section(self, parent, row):
         """Setup queue display section"""
@@ -299,6 +317,19 @@ class YouTubeDownloaderGUI:
             self.save_config()
             self.log_message(f"Download path changed to: {path}")
     
+    def open_download_folder(self):
+        """Open the download folder in the system's file explorer"""
+        path = self.path_var.get()
+        if os.path.exists(path):
+            if sys.platform == "win32":
+                subprocess.run(["explorer", path])
+            elif sys.platform == "darwin":
+                subprocess.run(["open", path])
+            else:
+                subprocess.run(["xdg-open", path])
+        else:
+            messagebox.showerror("Error", "Download path does not exist")
+    
     def validate_url(self, url):
         """Validate YouTube URL"""
         youtube_regex = re.compile(
@@ -321,6 +352,7 @@ class YouTubeDownloaderGUI:
                 info = ydl.extract_info(url, download=False)
                 
                 if 'entries' in info:  # Playlist
+                    playlist_title = info.get('title', 'Untitled Playlist')
                     videos = []
                     for entry in info['entries']:
                         if entry:  # Some entries might be None
@@ -328,7 +360,8 @@ class YouTubeDownloaderGUI:
                                 'url': entry.get('webpage_url', url),
                                 'title': entry.get('title', 'Unknown Title'),
                                 'duration': self.format_duration(entry.get('duration', 0)),
-                                'is_playlist': True
+                                'playlist_title': playlist_title,
+                                'playlist_index': entry.get('playlist_index', 0)
                             })
                     return videos
                 else:  # Single video
@@ -336,7 +369,8 @@ class YouTubeDownloaderGUI:
                         'url': url,
                         'title': info.get('title', 'Unknown Title'),
                         'duration': self.format_duration(info.get('duration', 0)),
-                        'is_playlist': False
+                        'playlist_title': None,
+                        'playlist_index': None
                     }]
         except Exception as e:
             self.log_message(f"Error extracting info for {url}: {str(e)}", "ERROR")
@@ -367,6 +401,7 @@ class YouTubeDownloaderGUI:
             messagebox.showerror("Error", "Invalid YouTube URL")
             return
         
+        self.extracting_label.config(text="Extracting video info...")
         self.log_message(f"Extracting info for: {url}")
         
         # Extract video info in background thread
@@ -376,6 +411,7 @@ class YouTubeDownloaderGUI:
                 self.root.after(0, lambda: self.add_videos_to_queue(videos))
             else:
                 self.root.after(0, lambda: self.log_message("Failed to extract video information", "ERROR"))
+            self.root.after(0, lambda: self.extracting_label.config(text=""))
         
         threading.Thread(target=extract_info, daemon=True).start()
         self.url_var.set("")  # Clear the entry
@@ -400,6 +436,7 @@ class YouTubeDownloaderGUI:
             messagebox.showerror("Error", "No valid YouTube URLs found")
             return
         
+        self.extracting_label.config(text="Extracting info for multiple URLs...")
         self.log_message(f"Processing {len(valid_urls)} URLs...")
         
         # Extract info for all URLs
@@ -412,6 +449,7 @@ class YouTubeDownloaderGUI:
             
             if all_videos:
                 self.root.after(0, lambda: self.add_videos_to_queue(all_videos))
+            self.root.after(0, lambda: self.extracting_label.config(text=""))
         
         threading.Thread(target=extract_all_info, daemon=True).start()
         self.multi_url_text.delete(1.0, tk.END)  # Clear the text area
@@ -426,7 +464,8 @@ class YouTubeDownloaderGUI:
                 'title': video['title'],
                 'duration': video['duration'],
                 'status': 'Queued',
-                'is_playlist': video.get('is_playlist', False)
+                'playlist_title': video.get('playlist_title'),
+                'playlist_index': video.get('playlist_index')
             })
             
             # Add to treeview
@@ -570,6 +609,10 @@ class YouTubeDownloaderGUI:
         self.current_percent_label.config(text="0%")
         self.current_file_label.config(text="Downloads stopped")
     
+    def sanitize_filename(self, name):
+        """Sanitize filename by removing invalid characters"""
+        return re.sub(r'[^\w\-_\. ]', '_', name)
+    
     def download_worker(self):
         """Background worker for downloading videos"""
         active_videos = [v for v in self.video_queue if v['status'] == 'Queued']
@@ -584,9 +627,21 @@ class YouTubeDownloaderGUI:
                 self.progress_queue.put(('status', video['id'], 'Downloading'))
                 self.progress_queue.put(('current_file', f"Downloading: {video['title']}"))
                 
+                # Configure output template based on playlist
+                if video.get('playlist_title'):
+                    playlist_folder = self.sanitize_filename(video['playlist_title'])
+                    download_dir = os.path.join(self.path_var.get(), playlist_folder)
+                    os.makedirs(download_dir, exist_ok=True)
+                    if video.get('playlist_index') is not None:
+                        outtmpl = os.path.join(download_dir, f"{video['playlist_index']:03d} - %(title)s.%(ext)s")
+                    else:
+                        outtmpl = os.path.join(download_dir, '%(title)s.%(ext)s')
+                else:
+                    outtmpl = os.path.join(self.path_var.get(), '%(title)s.%(ext)s')
+                
                 # Configure yt-dlp options
                 ydl_opts = {
-                    'outtmpl': os.path.join(self.path_var.get(), '%(title)s.%(ext)s'),
+                    'outtmpl': outtmpl,
                     'format': self.get_format_selector(),
                     'progress_hooks': [lambda d: self.progress_hook(d, video['id'])],
                 }
