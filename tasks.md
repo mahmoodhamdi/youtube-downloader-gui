@@ -73,10 +73,10 @@
 
 ## 🥈 Milestone 2: Stability & Core Enhancements
 
-* [ ] Add retry and error handling improvements
-* [ ] Implement queue persistence & resume support
-* [ ] Add disk space checking before downloads
-* [ ] Improve logs and user feedback
+* [x] Add retry and error handling improvements
+* [x] Implement queue persistence & resume support
+* [x] Add disk space checking before downloads
+* [x] Improve logs and user feedback
 
 ---
 
