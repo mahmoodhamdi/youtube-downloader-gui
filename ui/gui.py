@@ -1,5 +1,6 @@
 import os
 import queue
+import time
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox, scrolledtext
 import threading
@@ -12,7 +13,7 @@ from core.logger import Logger
 from core.downloader import DownloadManager
 
 class YouTubeDownloaderGUI:
-    """GUI for the YouTube Downloader application."""
+    """Enhanced GUI for YouTube Downloader with detailed progress feedback."""
     
     def __init__(self, root: tk.Tk):
         """
@@ -26,10 +27,10 @@ class YouTubeDownloaderGUI:
         self.root.minsize(800, 600)
         
         self.config = Config("downloader_config.json")
-        self.status_text = scrolledtext.ScrolledText(self.root, height=8, wrap=tk.WORD)  # Temporary, set in setup_gui
-        self.logger = Logger(self.status_text, log_file="downloader.log")  # New: Enable file logging
+        self.status_text = scrolledtext.ScrolledText(self.root, height=8, wrap=tk.WORD)
+        self.logger = Logger(self.status_text, log_file="downloader.log")
         self.download_manager = DownloadManager(self.config, self.logger)
-        self.video_queue: List[Dict[str, Any]] = []  # GUI display queue
+        self.video_queue: List[Dict[str, Any]] = []
         
         self.setup_gui()
         self.setup_styles()
@@ -43,9 +44,10 @@ class YouTubeDownloaderGUI:
         style.configure("Status.TLabel", font=("Arial", 9))
         style.configure("Success.TLabel", foreground="green")
         style.configure("Error.TLabel", foreground="red")
+        style.configure("Stalled.TLabel", foreground="orange")
 
     def setup_gui(self) -> None:
-        """Setup the main GUI layout."""
+        """Setup the main GUI layout with enhanced sections."""
         main_frame = ttk.Frame(self.root, padding="10")
         main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
         
@@ -59,10 +61,11 @@ class YouTubeDownloaderGUI:
         self.setup_queue_section(main_frame, 3)
         self.setup_progress_section(main_frame, 4)
         self.setup_control_buttons(main_frame, 5)
-        self.setup_status_section(main_frame, 6)
+        self.setup_stats_section(main_frame, 6)
+        self.setup_status_section(main_frame, 7)
         
         main_frame.rowconfigure(3, weight=1)
-        main_frame.rowconfigure(6, weight=1)
+        main_frame.rowconfigure(7, weight=1)
 
     def setup_url_section(self, parent: ttk.Frame, row: int) -> None:
         """Setup URL input section."""
@@ -86,7 +89,7 @@ class YouTubeDownloaderGUI:
         self.extracting_label.grid(row=2, column=0, columnspan=3, sticky=tk.W, pady=(5, 0))
 
     def setup_settings_section(self, parent: ttk.Frame, row: int) -> None:
-        """Setup download settings section."""
+        """Setup enhanced download settings section."""
         settings_frame = ttk.LabelFrame(parent, text="Download Settings", padding="10")
         settings_frame.grid(row=row, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(0, 10))
         settings_frame.columnconfigure(1, weight=1)
@@ -108,52 +111,329 @@ class YouTubeDownloaderGUI:
         ttk.Label(settings_frame, text="Subtitle Languages:").grid(row=2, column=0, sticky=tk.W, pady=(5, 0), padx=(0, 5))
         self.subtitle_langs_var = tk.StringVar(value=",".join(self.config.get('subtitle_langs', ['en'])))
         ttk.Entry(settings_frame, textvariable=self.subtitle_langs_var, width=20).grid(row=2, column=1, sticky=tk.W, pady=(5, 0), padx=(0, 5))
+        
+        self.thumbnail_var = tk.BooleanVar(value=self.config.get("download_thumbnails", False))
+        ttk.Checkbutton(settings_frame, text="Download Thumbnails", variable=self.thumbnail_var).grid(row=2, column=2, pady=(5, 0), padx=(5, 0))
+        
+        self.description_var = tk.BooleanVar(value=self.config.get("download_description", False))
+        ttk.Checkbutton(settings_frame, text="Download Description", variable=self.description_var).grid(row=3, column=2, pady=(5, 0), padx=(5, 0))
+        
+        self.playlist_folders_var = tk.BooleanVar(value=self.config.get("create_playlist_folders", True))
+        ttk.Checkbutton(settings_frame, text="Create Playlist Folders", variable=self.playlist_folders_var).grid(row=3, column=1, pady=(5, 0), padx=(5, 0))
+        
+        self.prefer_mp4_var = tk.BooleanVar(value=self.config.get("prefer_mp4", True))
+        ttk.Checkbutton(settings_frame, text="Prefer MP4 Format", variable=self.prefer_mp4_var).grid(row=4, column=1, pady=(5, 0), padx=(5, 0))
+        
+        ttk.Label(settings_frame, text="Retry Delay (s):").grid(row=4, column=0, sticky=tk.W, pady=(5, 0), padx=(0, 5))
+        self.retry_delay_var = tk.StringVar(value=str(self.config.get("retry_delay", 2)))
+        ttk.Entry(settings_frame, textvariable=self.retry_delay_var, width=10).grid(row=4, column=2, sticky=tk.W, pady=(5, 0), padx=(5, 0))
 
     def setup_queue_section(self, parent: ttk.Frame, row: int) -> None:
-        """Setup download queue display section."""
+        """Setup enhanced download queue display with additional metadata."""
         queue_frame = ttk.LabelFrame(parent, text="Download Queue", padding="10")
         queue_frame.grid(row=row, column=0, columnspan=3, sticky=(tk.W, tk.E, tk.N, tk.S), pady=(0, 10))
         queue_frame.columnconfigure(0, weight=1)
         queue_frame.rowconfigure(0, weight=1)
         
-        columns = ("URL", "Title", "Duration", "Status")
+        columns = ("URL", "Title", "Duration", "Status", "Uploader", "Upload Date", "Views")
         self.queue_tree = ttk.Treeview(queue_frame, columns=columns, show="tree headings", height=8)
         self.queue_tree.heading("#0", text="ID")
         self.queue_tree.column("#0", width=50, minwidth=50)
         for col in columns:
             self.queue_tree.heading(col, text=col)
-            self.queue_tree.column(col, width=300 if col == "URL" else 250 if col == "Title" else 80 if col == "Duration" else 100, minwidth=100)
+            self.queue_tree.column(col, width=300 if col == "URL" else 250 if col == "Title" else 80 if col == "Duration" else 100 if col == "Status" else 150, minwidth=100)
         self.queue_tree.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
         
         ttk.Scrollbar(queue_frame, orient=tk.VERTICAL, command=self.queue_tree.yview).grid(row=0, column=1, sticky=(tk.N, tk.S))
-        self.queue_tree.configure(yscrollcommand=lambda f, l: None)  # Placeholder to avoid warnings
+        self.queue_tree.configure(yscrollcommand=lambda f, l: None)
         
         queue_button_frame = ttk.Frame(queue_frame)
         queue_button_frame.grid(row=1, column=0, columnspan=2, pady=(10, 0))
         ttk.Button(queue_button_frame, text="Remove Selected", command=self.remove_from_queue).pack(side=tk.LEFT, padx=(0, 5))
         ttk.Button(queue_button_frame, text="Clear Queue", command=self.clear_queue).pack(side=tk.LEFT, padx=(0, 5))
         ttk.Button(queue_button_frame, text="Refresh Info", command=self.refresh_queue_info).pack(side=tk.LEFT)
-
     def setup_progress_section(self, parent: ttk.Frame, row: int) -> None:
-        """Setup download progress display section."""
+        """Setup enhanced download progress display section with detailed metrics."""
         progress_frame = ttk.LabelFrame(parent, text="Download Progress", padding="10")
         progress_frame.grid(row=row, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(0, 10))
         progress_frame.columnconfigure(1, weight=1)
         
-        ttk.Label(progress_frame, text="Current:").grid(row=0, column=0, sticky=tk.W, padx=(0, 5))
+        # Current download progress
+        ttk.Label(progress_frame, text="Current Download:").grid(row=0, column=0, sticky=tk.W, padx=(0, 5))
         self.current_progress = ttk.Progressbar(progress_frame, mode='determinate')
         self.current_progress.grid(row=0, column=1, sticky=(tk.W, tk.E), padx=(0, 5))
-        self.current_percent_label = ttk.Label(progress_frame, text="0%")
+        self.current_percent_label = ttk.Label(progress_frame, text="0%", width=6)
         self.current_percent_label.grid(row=0, column=2, padx=(5, 0))
         
-        ttk.Label(progress_frame, text="Overall:").grid(row=1, column=0, sticky=tk.W, pady=(5, 0), padx=(0, 5))
+        # Overall queue progress
+        ttk.Label(progress_frame, text="Overall Queue:").grid(row=1, column=0, sticky=tk.W, pady=(5, 0), padx=(0, 5))
         self.overall_progress = ttk.Progressbar(progress_frame, mode='determinate')
         self.overall_progress.grid(row=1, column=1, sticky=(tk.W, tk.E), pady=(5, 0), padx=(0, 5))
-        self.overall_percent_label = ttk.Label(progress_frame, text="0%")
+        self.overall_percent_label = ttk.Label(progress_frame, text="0%", width=6)
         self.overall_percent_label.grid(row=1, column=2, pady=(5, 0), padx=(5, 0))
         
-        self.current_file_label = ttk.Label(progress_frame, text="Ready to download...", style="Status.TLabel")
-        self.current_file_label.grid(row=2, column=0, columnspan=3, pady=(5, 0), sticky=tk.W)
+        # Current file status with enhanced styling
+        self.current_file_label = ttk.Label(progress_frame, text="Ready to download...", 
+                                        style="Status.TLabel", wraplength=600)
+        self.current_file_label.grid(row=2, column=0, columnspan=3, pady=(10, 0), sticky=(tk.W, tk.E))
+        
+        # Enhanced progress details frame
+        details_frame = ttk.Frame(progress_frame)
+        details_frame.grid(row=3, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(10, 0))
+        details_frame.columnconfigure(1, weight=1)
+        details_frame.columnconfigure(3, weight=1)
+        details_frame.columnconfigure(5, weight=1)
+        
+        # Download speed
+        ttk.Label(details_frame, text="Speed:").grid(row=0, column=0, sticky=tk.W, padx=(0, 5))
+        self.speed_label = ttk.Label(details_frame, text="-- B/s", style="Status.TLabel")
+        self.speed_label.grid(row=0, column=1, sticky=tk.W, padx=(0, 15))
+        
+        # ETA (Estimated Time of Arrival)
+        ttk.Label(details_frame, text="ETA:").grid(row=0, column=2, sticky=tk.W, padx=(0, 5))
+        self.eta_label = ttk.Label(details_frame, text="--", style="Status.TLabel")
+        self.eta_label.grid(row=0, column=3, sticky=tk.W, padx=(0, 15))
+        
+        # Elapsed time
+        ttk.Label(details_frame, text="Elapsed:").grid(row=0, column=4, sticky=tk.W, padx=(0, 5))
+        self.elapsed_label = ttk.Label(details_frame, text="--", style="Status.TLabel")
+        self.elapsed_label.grid(row=0, column=5, sticky=tk.W)
+        
+        # File size information
+        size_frame = ttk.Frame(progress_frame)
+        size_frame.grid(row=4, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(5, 0))
+        size_frame.columnconfigure(1, weight=1)
+        size_frame.columnconfigure(3, weight=1)
+        
+        ttk.Label(size_frame, text="Downloaded:").grid(row=0, column=0, sticky=tk.W, padx=(0, 5))
+        self.downloaded_size_label = ttk.Label(size_frame, text="0 B", style="Status.TLabel")
+        self.downloaded_size_label.grid(row=0, column=1, sticky=tk.W, padx=(0, 15))
+        
+        ttk.Label(size_frame, text="Total Size:").grid(row=0, column=2, sticky=tk.W, padx=(0, 5))
+        self.total_size_label = ttk.Label(size_frame, text="Unknown", style="Status.TLabel")
+        self.total_size_label.grid(row=0, column=3, sticky=tk.W)
+        
+        # Queue status frame
+        queue_status_frame = ttk.Frame(progress_frame)
+        queue_status_frame.grid(row=5, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(10, 0))
+        queue_status_frame.columnconfigure(1, weight=1)
+        queue_status_frame.columnconfigure(3, weight=1)
+        queue_status_frame.columnconfigure(5, weight=1)
+        
+        ttk.Label(queue_status_frame, text="Queue Status:").grid(row=0, column=0, sticky=tk.W, padx=(0, 5))
+        self.queue_status_label = ttk.Label(queue_status_frame, text="0 / 0", style="Status.TLabel")
+        self.queue_status_label.grid(row=0, column=1, sticky=tk.W, padx=(0, 15))
+        
+        ttk.Label(queue_status_frame, text="Remaining:").grid(row=0, column=2, sticky=tk.W, padx=(0, 5))
+        self.remaining_label = ttk.Label(queue_status_frame, text="0", style="Status.TLabel")
+        self.remaining_label.grid(row=0, column=3, sticky=tk.W, padx=(0, 15))
+        
+        ttk.Label(queue_status_frame, text="Errors:").grid(row=0, column=4, sticky=tk.W, padx=(0, 5))
+        self.errors_label = ttk.Label(queue_status_frame, text="0", style="Status.TLabel", foreground="red")
+        self.errors_label.grid(row=0, column=5, sticky=tk.W)
+        
+        # Current video info frame (expandable)
+        self.video_info_frame = ttk.LabelFrame(progress_frame, text="Current Video Info", padding="5")
+        self.video_info_frame.grid(row=6, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(10, 0))
+        self.video_info_frame.columnconfigure(1, weight=1)
+        
+        # Video title
+        ttk.Label(self.video_info_frame, text="Title:").grid(row=0, column=0, sticky=tk.W, padx=(0, 5))
+        self.video_title_label = ttk.Label(self.video_info_frame, text="--", style="Status.TLabel", wraplength=500)
+        self.video_title_label.grid(row=0, column=1, sticky=(tk.W, tk.E), padx=(0, 5))
+        
+        # Video duration and quality
+        info_sub_frame = ttk.Frame(self.video_info_frame)
+        info_sub_frame.grid(row=1, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(5, 0))
+        info_sub_frame.columnconfigure(1, weight=1)
+        info_sub_frame.columnconfigure(3, weight=1)
+        
+        ttk.Label(info_sub_frame, text="Duration:").grid(row=0, column=0, sticky=tk.W, padx=(0, 5))
+        self.video_duration_label = ttk.Label(info_sub_frame, text="--", style="Status.TLabel")
+        self.video_duration_label.grid(row=0, column=1, sticky=tk.W, padx=(0, 15))
+        
+        ttk.Label(info_sub_frame, text="Quality:").grid(row=0, column=2, sticky=tk.W, padx=(0, 5))
+        self.video_quality_label = ttk.Label(info_sub_frame, text="--", style="Status.TLabel")
+        self.video_quality_label.grid(row=0, column=3, sticky=tk.W)
+        
+        # Retry information
+        retry_frame = ttk.Frame(progress_frame)
+        retry_frame.grid(row=7, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(5, 0))
+        retry_frame.columnconfigure(1, weight=1)
+        
+        ttk.Label(retry_frame, text="Retry Info:").grid(row=0, column=0, sticky=tk.W, padx=(0, 5))
+        self.retry_info_label = ttk.Label(retry_frame, text="No retries", style="Status.TLabel")
+        self.retry_info_label.grid(row=0, column=1, sticky=tk.W, padx=(0, 5))
+        
+        # Hide video info frame initially
+        self.video_info_frame.grid_remove()
+        
+        # Toggle button for detailed view
+        self.toggle_details_var = tk.BooleanVar(value=False)
+        self.toggle_details_btn = ttk.Checkbutton(progress_frame, text="Show detailed video info", 
+                                                variable=self.toggle_details_var,
+                                                command=self.toggle_video_info)
+        self.toggle_details_btn.grid(row=8, column=0, columnspan=3, pady=(10, 0))
+
+    def toggle_video_info(self) -> None:
+        """Toggle the visibility of detailed video information."""
+        if self.toggle_details_var.get():
+            self.video_info_frame.grid()
+        else:
+            self.video_info_frame.grid_remove()
+
+    def update_detailed_progress(self, progress_info: Dict[str, Any]) -> None:
+        """Update GUI with detailed progress information."""
+        # Basic progress update
+        percent = progress_info.get('percent', 0)
+        self.current_progress['value'] = percent
+        self.current_percent_label.config(text=f"{percent:.1f}%")
+        
+        # Size information
+        downloaded_size = progress_info.get('downloaded_bytes', 0)
+        total_size = progress_info.get('total_bytes', 0)
+        self.downloaded_size_label.config(text=self.format_size(downloaded_size))
+        self.total_size_label.config(text=self.format_size(total_size) if total_size else "Unknown")
+        
+        # Speed and timing
+        speed = progress_info.get('speed', 0)
+        eta_seconds = progress_info.get('eta_seconds')
+        elapsed_seconds = progress_info.get('elapsed_seconds', 0)
+        
+        self.speed_label.config(text=self.format_speed(speed))
+        self.eta_label.config(text=self.format_time(eta_seconds) if eta_seconds else "Unknown")
+        self.elapsed_label.config(text=self.format_time(elapsed_seconds))
+        
+        # Current file status with enhanced styling
+        is_stalled = progress_info.get('is_stalled', False)
+        filename = progress_info.get('filename', 'Unknown file')
+        
+        if is_stalled:
+            status_text = f"[STALLED] {filename}"
+            self.current_file_label.config(text=status_text, style="Stalled.TLabel")
+            self.speed_label.config(text="0 B/s [STALLED]", style="Stalled.TLabel")
+        else:
+            status_text = f"Downloading: {filename}"
+            self.current_file_label.config(text=status_text, style="Status.TLabel")
+            self.speed_label.config(style="Status.TLabel")
+        
+        # Video information (if detailed view is enabled)
+        if self.toggle_details_var.get():
+            video_info = progress_info.get('video_info', {})
+            self.video_title_label.config(text=video_info.get('title', 'Unknown'))
+            self.video_duration_label.config(text=video_info.get('duration', 'Unknown'))
+            self.video_quality_label.config(text=video_info.get('quality', 'Unknown'))
+        
+        # Retry information
+        retry_count = progress_info.get('retry_count', 0)
+        max_retries = progress_info.get('max_retries', 0)
+        if retry_count > 0:
+            self.retry_info_label.config(text=f"Retry {retry_count}/{max_retries}", style="Error.TLabel")
+        else:
+            self.retry_info_label.config(text="No retries", style="Status.TLabel")
+
+    def update_queue_progress_info(self) -> None:
+        """Update queue-specific progress information."""
+        total_videos = len(self.video_queue)
+        completed_videos = len([v for v in self.video_queue if v['status'] == 'Completed'])
+        failed_videos = len([v for v in self.video_queue if v['status'] == 'Failed'])
+        remaining_videos = total_videos - completed_videos - failed_videos
+        
+        # Update queue status labels
+        self.queue_status_label.config(text=f"{completed_videos} / {total_videos}")
+        self.remaining_label.config(text=str(remaining_videos))
+        self.errors_label.config(text=str(failed_videos))
+        
+        # Update overall progress
+        if total_videos > 0:
+            overall_percent = (completed_videos / total_videos) * 100
+            self.overall_progress['value'] = overall_percent
+            self.overall_percent_label.config(text=f"{overall_percent:.1f}%")
+        else:
+            self.overall_progress['value'] = 0
+            self.overall_percent_label.config(text="0%")
+
+    def reset_progress_display(self) -> None:
+        """Reset all progress displays to initial state."""
+        self.current_progress['value'] = 0
+        self.current_percent_label.config(text="0%")
+        self.overall_progress['value'] = 0
+        self.overall_percent_label.config(text="0%")
+        
+        self.current_file_label.config(text="Ready to download...", style="Status.TLabel")
+        self.speed_label.config(text="-- B/s", style="Status.TLabel")
+        self.eta_label.config(text="--", style="Status.TLabel")
+        self.elapsed_label.config(text="--", style="Status.TLabel")
+        self.downloaded_size_label.config(text="0 B", style="Status.TLabel")
+        self.total_size_label.config(text="Unknown", style="Status.TLabel")
+        
+        self.queue_status_label.config(text="0 / 0", style="Status.TLabel")
+        self.remaining_label.config(text="0", style="Status.TLabel")
+        self.errors_label.config(text="0", style="Status.TLabel")
+        
+        self.video_title_label.config(text="--", style="Status.TLabel")
+        self.video_duration_label.config(text="--", style="Status.TLabel")
+        self.video_quality_label.config(text="--", style="Status.TLabel")
+        self.retry_info_label.config(text="No retries", style="Status.TLabel")
+
+    def update_progress_colors(self) -> None:
+        """Update progress bar colors based on status."""
+        # You can customize progress bar colors here
+        style = ttk.Style()
+        
+        # Define custom progress bar styles
+        style.configure("Success.Horizontal.TProgressbar", 
+                    troughcolor="lightgray", 
+                    background="green",
+                    lightcolor="lightgreen",
+                    darkcolor="darkgreen")
+        
+        style.configure("Warning.Horizontal.TProgressbar", 
+                    troughcolor="lightgray", 
+                    background="orange",
+                    lightcolor="lightyellow",
+                    darkcolor="darkorange")
+        
+        style.configure("Error.Horizontal.TProgressbar", 
+                    troughcolor="lightgray", 
+                    background="red",
+                    lightcolor="lightcoral",
+                    darkcolor="darkred")
+        
+        # Apply styles based on current status
+        if hasattr(self, 'current_progress'):
+            current_value = self.current_progress['value']
+            if current_value >= 100:
+                self.current_progress.configure(style="Success.Horizontal.TProgressbar")
+            elif current_value > 0:
+                self.current_progress.configure(style="TProgressbar")  # Default style
+            else:
+                self.current_progress.configure(style="TProgressbar")  # Default style
+    def setup_stats_section(self, parent: ttk.Frame, row: int) -> None:
+        """Setup new statistics display section."""
+        stats_frame = ttk.LabelFrame(parent, text="Download Statistics", padding="10")
+        stats_frame.grid(row=row, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(0, 10))
+        stats_frame.columnconfigure(1, weight=1)
+        
+        ttk.Label(stats_frame, text="Total Downloads:").grid(row=0, column=0, sticky=tk.W, padx=(0, 5))
+        self.total_downloads_label = ttk.Label(stats_frame, text="0")
+        self.total_downloads_label.grid(row=0, column=1, sticky=tk.W, padx=(0, 5))
+        
+        ttk.Label(stats_frame, text="Successful:").grid(row=0, column=2, sticky=tk.W, padx=(5, 0))
+        self.successful_downloads_label = ttk.Label(stats_frame, text="0")
+        self.successful_downloads_label.grid(row=0, column=3, sticky=tk.W)
+        
+        ttk.Label(stats_frame, text="Failed:").grid(row=1, column=0, sticky=tk.W, pady=(5, 0), padx=(0, 5))
+        self.failed_downloads_label = ttk.Label(stats_frame, text="0")
+        self.failed_downloads_label.grid(row=1, column=1, sticky=tk.W, pady=(5, 0), padx=(0, 5))
+        
+        ttk.Label(stats_frame, text="Total Downloaded:").grid(row=1, column=2, sticky=tk.W, pady=(5, 0), padx=(5, 0))
+        self.total_bytes_label = ttk.Label(stats_frame, text="0 B")
+        self.total_bytes_label.grid(row=1, column=3, sticky=tk.W, pady=(5, 0))
+        
+        ttk.Label(stats_frame, text="Session Time:").grid(row=2, column=0, sticky=tk.W, pady=(5, 0), padx=(0, 5))
+        self.session_time_label = ttk.Label(stats_frame, text="0s")
+        self.session_time_label.grid(row=2, column=1, sticky=tk.W, pady=(5, 0), padx=(0, 5))
 
     def setup_control_buttons(self, parent: ttk.Frame, row: int) -> None:
         """Setup control buttons for starting/stopping downloads."""
@@ -259,7 +539,7 @@ class YouTubeDownloaderGUI:
         for item in selected_items:
             self.queue_tree.delete(item)
         self.logger.log(message=f"Removed {len(selected_items)} item(s) from queue")
-        self.download_manager.save_queue()  # New: Save queue after removal
+        self.download_manager.save_queue()
         self.update_overall_progress()
 
     def clear_queue(self) -> None:
@@ -269,8 +549,9 @@ class YouTubeDownloaderGUI:
             for item in self.queue_tree.get_children():
                 self.queue_tree.delete(item)
             self.logger.log(message="Queue cleared")
-            self.download_manager.save_queue()  # New: Save queue after clearing
+            self.download_manager.save_queue()
             self.update_overall_progress()
+            self.update_stats_display()
 
     def refresh_queue_info(self) -> None:
         """Refresh video information for queued items."""
@@ -280,7 +561,7 @@ class YouTubeDownloaderGUI:
         self.logger.log(message="Refreshing queue information...")
         for video in self.video_queue:
             if video['status'] == 'Queued':
-                self.download_manager.add_to_queue(video['url'])  # Re-add to refresh info
+                self.download_manager.add_to_queue(video['url'])
         self.logger.log(message="Queue information refreshed")
 
     def start_downloads(self) -> None:
@@ -295,14 +576,28 @@ class YouTubeDownloaderGUI:
         if not self.download_manager.check_disk_space():
             messagebox.showerror("Error", "Insufficient disk space to start downloads")
             return
+        try:
+            retry_delay = float(self.retry_delay_var.get())
+            if retry_delay < 0:
+                raise ValueError("Retry delay must be non-negative")
+        except ValueError as e:
+            messagebox.showerror("Error", f"Invalid retry delay: {str(e)}")
+            return
         self.config.set("download_path", self.path_var.get())
         self.config.set("quality", self.quality_var.get())
         self.config.set("include_subtitles", self.subtitle_var.get())
         self.config.set("subtitle_langs", [lang.strip() for lang in self.subtitle_langs_var.get().split(',') if lang.strip()])
+        self.config.set("download_thumbnails", self.thumbnail_var.get())
+        self.config.set("download_description", self.description_var.get())
+        self.config.set("create_playlist_folders", self.playlist_folders_var.get())
+        self.config.set("prefer_mp4", self.prefer_mp4_var.get())
+        self.config.set("retry_delay", float(self.retry_delay_var.get()))
         self.config.save_config()
         self.start_button.config(state="disabled")
         self.pause_button.config(state="normal")
         self.stop_button.config(state="normal")
+        self.download_manager.reset_download_stats()
+        self.update_stats_display()
         self.logger.log(message=f"Starting download of {len(active_videos)} video(s)")
         self.download_manager.start_downloads()
 
@@ -319,7 +614,8 @@ class YouTubeDownloaderGUI:
         self.current_progress['value'] = 0
         self.current_percent_label.config(text="0%")
         self.current_file_label.config(text="Downloads stopped")
-        self.download_manager.save_queue()  # New: Save queue on stop
+        self.update_stats_display()
+        self.download_manager.save_queue()
 
     def check_progress_queue(self) -> None:
         """Check for progress updates from the download manager."""
@@ -328,11 +624,18 @@ class YouTubeDownloaderGUI:
                 item = self.download_manager.progress_queue.get_nowait()
                 if item[0] == 'video_added':
                     self.video_queue.append(item[1])
+                    # Safely handle missing metadata fields
+                    uploader = item[1].get('uploader', 'Unknown')[:20] + '...' if len(item[1].get('uploader', 'Unknown')) > 20 else item[1].get('uploader', 'Unknown')
+                    upload_date = item[1].get('upload_date', 'Unknown')
+                    view_count = f"{item[1].get('view_count', 0):,}"
                     self.queue_tree.insert('', 'end', text=str(item[1]['id']), values=(
                         item[1]['url'][:50] + '...' if len(item[1]['url']) > 50 else item[1]['url'],
                         item[1]['title'][:40] + '...' if len(item[1]['title']) > 40 else item[1]['title'],
                         item[1]['duration'],
-                        item[1]['status']
+                        item[1]['status'],
+                        uploader,
+                        upload_date,
+                        view_count
                     ))
                     self.update_overall_progress()
                 elif item[0] == 'progress':
@@ -342,16 +645,77 @@ class YouTubeDownloaderGUI:
                     self.update_video_status(item[1], item[2])
                     self.update_overall_progress()
                 elif item[0] == 'current_file':
-                    self.current_file_label.config(text=item[1])
+                    style = "Stalled.TLabel" if "[STALLED]" in item[1] else "Status.TLabel"
+                    self.current_file_label.config(text=item[1], style=style)
                 elif item[0] == 'log':
                     self.logger.log(message=item[1], level=item[2] if len(item) > 2 else 'INFO')
                     if item[2] == 'ERROR':
-                        messagebox.showerror("Error", item[1])  # New: Show error messages in GUI
+                        messagebox.showerror("Error", item[1])
+                elif item[0] == 'detailed_progress':
+                    self.update_detailed_progress(item[1])
                 elif item[0] == 'download_complete':
                     self.download_complete()
         except queue.Empty:
             pass
+        self.update_stats_display()
         self.root.after(100, self.check_progress_queue)
+
+    def update_detailed_progress(self, progress_info: Dict[str, Any]) -> None:
+        """Update GUI with detailed progress information."""
+        percent = progress_info['percent']
+        downloaded_size = self.format_size(progress_info['downloaded_bytes'])
+        total_size = self.format_size(progress_info['total_bytes']) if progress_info['total_bytes'] else "Unknown"
+        speed = self.format_speed(progress_info['speed'])
+        eta = self.format_time(progress_info['eta_seconds'])
+        elapsed = self.format_time(progress_info['elapsed_seconds'])
+        stalled = " [STALLED]" if progress_info['is_stalled'] else ""
+        
+        progress_msg = (
+            f"Downloading: {percent:.1f}% ({downloaded_size}/{total_size}) | "
+            f"Speed: {speed} | ETA: {eta} | Elapsed: {elapsed}{stalled}"
+        )
+        style = "Stalled.TLabel" if stalled else "Status.TLabel"
+        self.current_file_label.config(text=progress_msg, style=style)
+
+    def format_size(self, bytes_size: int) -> str:
+        """Format byte size to human-readable string."""
+        if bytes_size < 1024:
+            return f"{bytes_size} B"
+        elif bytes_size < 1024 * 1024:
+            return f"{bytes_size/1024:.1f} KB"
+        elif bytes_size < 1024 * 1024 * 1024:
+            return f"{bytes_size/(1024*1024):.1f} MB"
+        else:
+            return f"{bytes_size/(1024*1024*1024):.1f} GB"
+
+    def format_speed(self, speed: float) -> str:
+        """Format speed to human-readable string."""
+        if speed == 0:
+            return "-- B/s"
+        elif speed < 1024:
+            return f"{speed:.1f} B/s"
+        elif speed < 1024 * 1024:
+            return f"{speed/1024:.1f} KB/s"
+        elif speed < 1024 * 1024 * 1024:
+            return f"{speed/(1024*1024):.1f} MB/s"
+        else:
+            return f"{speed/(1024*1024*1024):.1f} GB/s"
+
+    def format_time(self, seconds: float) -> str:
+        """Format time duration to human-readable string."""
+        if seconds is None:
+            return "Unknown"
+        seconds = int(seconds)
+        if seconds < 60:
+            return f"{seconds}s"
+        elif seconds < 3600:
+            minutes = seconds // 60
+            secs = seconds % 60
+            return f"{minutes}m {secs}s"
+        else:
+            hours = seconds // 3600
+            minutes = (seconds % 3600) // 60
+            return f"{hours}h {minutes}m"
 
     def update_video_status(self, video_id: int, status: str) -> None:
         """
@@ -380,6 +744,16 @@ class YouTubeDownloaderGUI:
         self.overall_progress['value'] = progress_percent
         self.overall_percent_label.config(text=f"{progress_percent:.1f}%")
 
+    def update_stats_display(self) -> None:
+        """Update the statistics display with current download stats."""
+        stats = self.download_manager.get_download_stats()
+        session_time = time.time() - stats['session_start_time']
+        self.total_downloads_label.config(text=str(stats['total_downloads']))
+        self.successful_downloads_label.config(text=str(stats['successful_downloads']))
+        self.failed_downloads_label.config(text=str(stats['failed_downloads']))
+        self.total_bytes_label.config(text=self.format_size(stats['total_bytes_downloaded']))
+        self.session_time_label.config(text=self.format_time(session_time))
+
     def download_complete(self) -> None:
         """Handle download completion."""
         self.start_button.config(state="normal")
@@ -388,9 +762,11 @@ class YouTubeDownloaderGUI:
         self.current_progress['value'] = 0
         self.current_percent_label.config(text="0%")
         self.current_file_label.config(text="All downloads completed!")
-        completed_count = len([v for v in self.video_queue if v['status'] == 'Completed'])
+        stats = self.download_manager.get_download_stats()
+        completed_count = stats['successful_downloads']
         messagebox.showinfo("Downloads Complete", f"Successfully downloaded {completed_count} video(s)!")
-        self.download_manager.save_queue()  # New: Save queue on completion
+        self.update_stats_display()
+        self.download_manager.save_queue()
 
     def on_closing(self) -> None:
         """Handle application closing."""
@@ -398,5 +774,5 @@ class YouTubeDownloaderGUI:
         self.config.save_config()
         if self.download_manager.is_downloading:
             self.download_manager.stop_downloads()
-        self.download_manager.save_queue()  # New: Save queue on close
+        self.download_manager.save_queue()
         self.root.destroy()
