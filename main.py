@@ -9,8 +9,8 @@ def main() -> None:
     if app.config.get("window_geometry"):
         try:
             root.geometry(app.config.get("window_geometry"))
-        except:
-            pass
+        except Exception as e:
+            print(f"Error setting window geometry: {e}")
     root.mainloop()
 
 if __name__ == "__main__":

@@ -64,10 +64,10 @@
 
 ## 🥇 Milestone 1: Code Refactoring & SOC Foundation
 
-* [ ] Restructure files into modular folders (core, UI, utils, services)
-* [ ] Move config and logger to separate modules
-* [ ] Introduce type hints and docstrings
-* [ ] Decouple GUI from backend logic
+* [x] Restructure files into modular folders (core, UI, utils, services)
+* [x] Move config and logger to separate modules
+* [x] Introduce type hints and docstrings
+* [x] Decouple GUI from backend logic
 
 ---
 

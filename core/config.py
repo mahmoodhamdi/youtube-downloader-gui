@@ -27,7 +27,9 @@ class Config:
             "quality": "best",
             "include_subtitles": False,
             "subtitle_langs": ["en"],
-            "window_geometry": "900x700"
+            "window_geometry": "900x700",
+            "max_retries": 3,  # New: Maximum retry attempts for downloads
+            "queue_file": "queue.json"  # New: File for queue persistence
         }
         
         try:

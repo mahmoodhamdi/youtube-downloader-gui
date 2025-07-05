@@ -27,14 +27,14 @@ class YouTubeDownloaderGUI:
         
         self.config = Config("downloader_config.json")
         self.status_text = scrolledtext.ScrolledText(self.root, height=8, wrap=tk.WORD)  # Temporary, set in setup_gui
-        self.logger = Logger(self.status_text)
+        self.logger = Logger(self.status_text, log_file="downloader.log")  # New: Enable file logging
         self.download_manager = DownloadManager(self.config, self.logger)
         self.video_queue: List[Dict[str, Any]] = []  # GUI display queue
         
         self.setup_gui()
         self.setup_styles()
         self.root.after(100, self.check_progress_queue)
-        self.logger.log(message="YouTube Downloader Pro initialized. Ready to download videos!")  # Fixed: Added 'message='
+        self.logger.log(message="YouTube Downloader Pro initialized. Ready to download videos!")
 
     def setup_styles(self) -> None:
         """Setup custom styles for the application."""
@@ -259,6 +259,7 @@ class YouTubeDownloaderGUI:
         for item in selected_items:
             self.queue_tree.delete(item)
         self.logger.log(message=f"Removed {len(selected_items)} item(s) from queue")
+        self.download_manager.save_queue()  # New: Save queue after removal
         self.update_overall_progress()
 
     def clear_queue(self) -> None:
@@ -268,11 +269,13 @@ class YouTubeDownloaderGUI:
             for item in self.queue_tree.get_children():
                 self.queue_tree.delete(item)
             self.logger.log(message="Queue cleared")
+            self.download_manager.save_queue()  # New: Save queue after clearing
             self.update_overall_progress()
 
     def refresh_queue_info(self) -> None:
         """Refresh video information for queued items."""
         if not self.video_queue:
+            self.logger.log(message="No videos in queue to refresh", level="WARNING")
             return
         self.logger.log(message="Refreshing queue information...")
         for video in self.video_queue:
@@ -286,6 +289,12 @@ class YouTubeDownloaderGUI:
         if not active_videos:
             messagebox.showwarning("Warning", "No videos in queue to download")
             return
+        if not os.path.exists(self.path_var.get()):
+            messagebox.showerror("Error", "Download path does not exist")
+            return
+        if not self.download_manager.check_disk_space():
+            messagebox.showerror("Error", "Insufficient disk space to start downloads")
+            return
         self.config.set("download_path", self.path_var.get())
         self.config.set("quality", self.quality_var.get())
         self.config.set("include_subtitles", self.subtitle_var.get())
@@ -294,6 +303,7 @@ class YouTubeDownloaderGUI:
         self.start_button.config(state="disabled")
         self.pause_button.config(state="normal")
         self.stop_button.config(state="normal")
+        self.logger.log(message=f"Starting download of {len(active_videos)} video(s)")
         self.download_manager.start_downloads()
 
     def pause_downloads(self) -> None:
@@ -309,21 +319,22 @@ class YouTubeDownloaderGUI:
         self.current_progress['value'] = 0
         self.current_percent_label.config(text="0%")
         self.current_file_label.config(text="Downloads stopped")
+        self.download_manager.save_queue()  # New: Save queue on stop
 
     def check_progress_queue(self) -> None:
         """Check for progress updates from the download manager."""
         try:
             while True:
                 item = self.download_manager.progress_queue.get_nowait()
-            
                 if item[0] == 'video_added':
                     self.video_queue.append(item[1])
                     self.queue_tree.insert('', 'end', text=str(item[1]['id']), values=(
                         item[1]['url'][:50] + '...' if len(item[1]['url']) > 50 else item[1]['url'],
                         item[1]['title'][:40] + '...' if len(item[1]['title']) > 40 else item[1]['title'],
                         item[1]['duration'],
-                        'Queued'
+                        item[1]['status']
                     ))
+                    self.update_overall_progress()
                 elif item[0] == 'progress':
                     self.current_progress['value'] = item[1]
                     self.current_percent_label.config(text=f"{item[1]:.1f}%")
@@ -334,6 +345,8 @@ class YouTubeDownloaderGUI:
                     self.current_file_label.config(text=item[1])
                 elif item[0] == 'log':
                     self.logger.log(message=item[1], level=item[2] if len(item) > 2 else 'INFO')
+                    if item[2] == 'ERROR':
+                        messagebox.showerror("Error", item[1])  # New: Show error messages in GUI
                 elif item[0] == 'download_complete':
                     self.download_complete()
         except queue.Empty:
@@ -377,11 +390,13 @@ class YouTubeDownloaderGUI:
         self.current_file_label.config(text="All downloads completed!")
         completed_count = len([v for v in self.video_queue if v['status'] == 'Completed'])
         messagebox.showinfo("Downloads Complete", f"Successfully downloaded {completed_count} video(s)!")
+        self.download_manager.save_queue()  # New: Save queue on completion
 
     def on_closing(self) -> None:
         """Handle application closing."""
         self.config.set("window_geometry", self.root.geometry())
         self.config.save_config()
         if self.download_manager.is_downloading:
-            self.stop_downloads()
+            self.download_manager.stop_downloads()
+        self.download_manager.save_queue()  # New: Save queue on close
         self.root.destroy()

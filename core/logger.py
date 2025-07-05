@@ -22,16 +22,20 @@ class Logger:
 
         Args:
             message (str): Message to log.
-            level (str): Log level (e.g., INFO, ERROR). Defaults to "INFO".
+            level (str): Log level (e.g., INFO, ERROR, WARNING, SUCCESS). Defaults to "INFO".
         """
-        timestamp = datetime.now().strftime("%H:%M:%S")
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         formatted_message = f"[{timestamp}] {level}: {message}\n"
         
         self.status_text.insert('end', formatted_message)
         self.status_text.see('end')
         
         if self.log_file:
-            with open(self.log_file, 'a') as f:
-                f.write(formatted_message)
+            try:
+                with open(self.log_file, 'a') as f:
+                    f.write(formatted_message)
+            except Exception as e:
+                self.status_text.insert('end', f"[{timestamp}] ERROR: Failed to write to log file: {e}\n")
+                self.status_text.see('end')
         
         print(formatted_message.strip())
