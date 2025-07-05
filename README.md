@@ -96,12 +96,12 @@ A comprehensive GUI application for downloading YouTube videos and playlists wit
 4. **Run the application**:
 
    ```bash
-   python youtube_downloader.py
+   python main.py
    ```
 
 ### Option 2: Use Pre-built Executable
 
-1. Download the latest release from the [Releases](https://github.com/your-username/youtube-downloader-gui/releases) page
+1. Download the latest release from the [Releases](https://github.com/mahmoodhamdi/youtube-downloader-gui/releases) page
 2. Extract the archive
 3. Run the executable:
    - Windows: Double-click `YouTubeDownloader.exe`
@@ -220,13 +220,19 @@ Thanks to `yt-dlp`, this application supports downloading from:
 
 ```structure
 youtube-downloader-gui/
-├── youtube_downloader.py      # Main application
-├── requirements.txt           # Dependencies
-├── build.py                  # Build script
-├── setup.py                  # Package setup
-├── .gitignore               # Git ignore rules
-├── README.md               # This file
-└── dist/                   # Built executables (created by build.py)
+├── core/
+│   ├── config.py          # Configuration management
+│   ├── logger.py         # Logging utilities
+│   ├── downloader.py     # Download management and yt-dlp integration
+├── ui/
+│   ├── gui.py            # Tkinter GUI implementation
+├── main.py               # Application entry point
+├── requirements.txt       # Dependencies
+├── build.py              # Build script
+├── setup.py              # Package setup
+├── .gitignore            # Git ignore rules
+├── README.md             # This file
+└── dist/                 # Built executables (created by build.py)
 ```
 
 ### Building Executables
@@ -274,4 +280,4 @@ This tool is for personal use only. Please respect copyright laws and YouTube's 
 
 ---
 
-**Made with ❤️ by the Mahmood Hamdi**
+***Made with ❤️ by Mahmood Hamdi***

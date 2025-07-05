@@ -9,8 +9,17 @@ import subprocess
 import shutil
 from pathlib import Path
 
-def run_command(command, description=""):
-    """Run a command and handle errors"""
+def run_command(command: str, description: str = "") -> bool:
+    """
+    Run a command and handle errors.
+
+    Args:
+        command (str): Command to execute.
+        description (str): Description of the command for logging.
+
+    Returns:
+        bool: True if successful, False otherwise.
+    """
     print(f"\n{'='*50}")
     print(f"Running: {description if description else command}")
     print('='*50)
@@ -26,8 +35,8 @@ def run_command(command, description=""):
         print(f"Error output: {e.stderr}")
         return False
 
-def clean_build_dirs():
-    """Clean previous build directories"""
+def clean_build_dirs() -> None:
+    """Clean previous build directories."""
     dirs_to_clean = ['build', 'dist', '__pycache__']
     
     for dir_name in dirs_to_clean:
@@ -35,14 +44,14 @@ def clean_build_dirs():
             print(f"Cleaning {dir_name}...")
             shutil.rmtree(dir_name)
 
-def create_spec_file():
-    """Create PyInstaller spec file with custom configuration"""
+def create_spec_file() -> None:
+    """Create PyInstaller spec file with custom configuration."""
     spec_content = '''# -*- mode: python ; coding: utf-8 -*-
 
 block_cipher = None
 
 a = Analysis(
-    ['youtube_downloader.py'],
+    ['main.py'],
     pathex=[],
     binaries=[],
     datas=[],
@@ -104,20 +113,22 @@ exe = EXE(
     
     print("Created PyInstaller spec file")
 
-def build_executable():
-    """Build the executable using PyInstaller"""
+def build_executable() -> bool:
+    """
+    Build the executable using PyInstaller.
+
+    Returns:
+        bool: True if build successful, False otherwise.
+    """
     print("Building executable with PyInstaller...")
     
-    # Create spec file
     create_spec_file()
     
-    # Build using spec file
     command = "pyinstaller --clean youtube_downloader.spec"
     
     if not run_command(command, "Building executable"):
         return False
     
-    # Check if executable was created
     if sys.platform.startswith('win'):
         exe_path = Path('dist/YouTubeDownloader.exe')
     else:
@@ -131,8 +142,8 @@ def build_executable():
         print("❌ Executable not found after build")
         return False
 
-def create_installer_script():
-    """Create a simple installer script for Windows"""
+def create_installer_script() -> None:
+    """Create a simple installer script for Windows."""
     if not sys.platform.startswith('win'):
         return
     
@@ -165,32 +176,27 @@ pause
     
     print("Created Windows installer script: dist/install.bat")
 
-def main():
-    """Main build function"""
+def main() -> None:
+    """Main build function."""
     print("YouTube Downloader GUI - Build Script")
     print("=====================================")
     
-    # Check if main file exists
-    if not os.path.exists('youtube_downloader.py'):
-        print("❌ youtube_downloader.py not found!")
+    if not os.path.exists('main.py'):
+        print("❌ main.py not found!")
         print("   Make sure you're running this script from the project root directory.")
         sys.exit(1)
     
-    # Clean previous builds
     clean_build_dirs()
     
-    # Install/upgrade PyInstaller
     print("\nInstalling/upgrading PyInstaller...")
     if not run_command("pip install --upgrade pyinstaller", "Installing PyInstaller"):
         print("❌ Failed to install PyInstaller")
         sys.exit(1)
     
-    # Build executable
     if not build_executable():
         print("❌ Build failed!")
         sys.exit(1)
     
-    # Create installer for Windows
     create_installer_script()
     
     print("\n" + "="*50)

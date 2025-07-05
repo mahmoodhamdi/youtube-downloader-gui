@@ -6,16 +6,26 @@ Setup script for YouTube Downloader GUI
 from setuptools import setup, find_packages
 import os
 
-# Read the README file
 def read_readme():
+    """
+    Read the README file content.
+
+    Returns:
+        str: Content of README.md or a default description if not found.
+    """
     try:
         with open("README.md", "r", encoding="utf-8") as fh:
             return fh.read()
     except FileNotFoundError:
         return "YouTube Downloader GUI - A comprehensive tool for downloading YouTube videos and playlists"
 
-# Read requirements
 def read_requirements():
+    """
+    Read the requirements file content.
+
+    Returns:
+        list: List of dependencies or default dependencies if not found.
+    """
     try:
         with open("requirements.txt", "r", encoding="utf-8") as fh:
             return [line.strip() for line in fh if line.strip() and not line.startswith("#")]
@@ -25,12 +35,12 @@ def read_requirements():
 setup(
     name="youtube-downloader-gui",
     version="1.0.0",
-    author="YouTube Downloader Team",
-    author_email="contact@example.com",
+    author="Mahmood Hamdi",
+    author_email="hmdy7486@gmail.com",
     description="A comprehensive GUI application for downloading YouTube videos and playlists",
     long_description=read_readme(),
     long_description_content_type="text/markdown",
-    url="https://github.com/example/youtube-downloader-gui",
+    url="https://github.com/mahmoodhamdi/youtube-downloader-gui",
     packages=find_packages(),
     classifiers=[
         "Development Status :: 4 - Beta",
@@ -49,7 +59,7 @@ setup(
     install_requires=read_requirements(),
     entry_points={
         "console_scripts": [
-            "youtube-downloader=youtube_downloader:main",
+            "youtube-downloader=main:main",
         ],
     },
     include_package_data=True,
