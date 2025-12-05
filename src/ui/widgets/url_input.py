@@ -290,3 +290,11 @@ class URLInputWidget(ttk.Frame):
     def focus_entry(self):
         """Focus the URL entry field."""
         self.url_entry.focus_set()
+
+    def get_url(self) -> str:
+        """Get the current URL from the entry field.
+
+        Returns:
+            Current URL string
+        """
+        return self.url_var.get()

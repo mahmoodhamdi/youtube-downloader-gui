@@ -4,15 +4,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-YouTube Downloader Pro is a Python-based GUI application for downloading YouTube videos and playlists using yt-dlp as the backend. It features a Tkinter-based interface with multi-threaded downloads, queue management, and download history tracking.
+YouTube Downloader Pro v2.0 is a Python-based GUI application for downloading YouTube videos and playlists using yt-dlp as the backend. It features a modular Tkinter-based interface with thread-safe queue management, concurrent downloads, and download history tracking.
 
 ## Commands
 
 ### Running the Application
 ```bash
-python youtube_downloader.py
-# or
-python youtube_downloader1.py  # Enhanced version with tabbed interface
+python main.py
 ```
 
 ### Installing Dependencies
@@ -20,71 +18,87 @@ python youtube_downloader1.py  # Enhanced version with tabbed interface
 pip install -r requirements.txt
 ```
 
-Key dependencies: `yt-dlp`, `pillow`, `requests`
+Key dependencies: `yt-dlp`, `pillow`, `requests`, `pyinstaller` (for building)
 
-## Architecture
+### Testing
+```bash
+python -m pytest tests/
+```
 
-### Main Files
+### Building Executable
+```bash
+python build.py
+```
 
-- **youtube_downloader.py**: Original single-class implementation (~1200 lines) with basic download queue and progress tracking
-- **youtube_downloader1.py**: Enhanced version (~1950 lines) with additional features:
-  - Tabbed interface (Downloads, Settings, History)
-  - Thread-safe state management classes
-  - Video info caching (`VideoInfoCache`)
-  - Download history persistence (`DownloadHistory`)
-  - Retry mechanism with exponential backoff (`RetryManager`)
+## Architecture (v2.0)
 
-### Class Structure (youtube_downloader1.py)
+The application follows a modular architecture with clear separation between core logic, UI, and configuration.
 
-- `YouTubeDownloaderGUI`: Main application class handling GUI and orchestrating downloads
-- `ThreadSafeLogger`: Thread-safe logging wrapper
-- `DownloadState`: Thread-safe download state management (start/stop/pause/resume)
-- `VideoInfoCache`: LRU-style cache for video metadata
-- `RetryManager`: Handles retry logic with exponential backoff
-- `DownloadHistory`: Persists download history to JSON
+### Entry Point
+- **main.py**: Application entry point, validates dependencies and launches `MainWindow`
 
-### Threading Model
+### Core Modules (`src/core/`)
+- **queue_manager.py**: Thread-safe `QueueManager` with `VideoItem` dataclass and `VideoStatus` enum. Uses `OrderedDict` with `RLock` and `Condition` for safe concurrent access
+- **download_manager.py**: `DownloadManager` with `ThreadPoolExecutor` for concurrent downloads, pause/resume/stop controls, and retry logic with exponential backoff
 
-- Uses `ThreadPoolExecutor` for concurrent downloads
-- Progress updates sent via `queue.Queue` to main thread
-- GUI updates scheduled via `root.after()` for thread safety
-- `threading.Lock` used for shared state protection
+### Configuration (`src/config/`)
+- **config_manager.py**: Persistent settings stored in `~/.ytdownloader/config.json`
+- **validators.py**: `URLValidator`, `PathValidator` for input validation
+- **defaults.py**: Default configuration values
 
-### Configuration
+### UI Components (`src/ui/`)
+- **main_window.py**: `MainWindow` class orchestrating all components with tabbed interface
+- **tabs/**: `DownloadsTab`, `SettingsTab`, `HistoryTab`
+- **widgets/**: Reusable components (`URLInput`, `ProgressWidget`, `QueueWidget`, `StatusBar`)
+- **themes/**: `ThemeManager` for light/dark/system theme support
 
-Config stored in `downloader_config.json`:
-- Download path, quality settings
-- Subtitle preferences
-- Concurrent download limits
-- Bandwidth limiting
+### Utilities (`src/utils/`)
+- **logger.py**: Thread-safe `Logger` with file output
+- **error_handler.py**: Centralized error handling
+- **cache.py**: LRU-style caching utilities
+- **file_utils.py**: File operations and filename sanitization
+
+### Custom Exceptions (`src/exceptions/`)
+- **errors.py**: `DownloadError`, `NetworkError`, `AuthenticationError`, `ExtractionError`
 
 ## Key Patterns
+
+### Thread-Safe Queue Operations
+```python
+# QueueManager uses RLock + Condition for thread safety
+with self._lock:
+    self._queue[video.id] = video
+    self._condition.notify_all()
+```
+
+### Callback-Based Communication
+```python
+# MainWindow connects callbacks between components
+self.queue_manager.on_item_added = self._on_queue_item_added
+self.download_manager.on_progress = self._on_download_progress
+```
+
+### GUI Thread Safety
+```python
+# Worker threads schedule GUI updates via root.after()
+self.root.after(0, lambda: self.downloads_tab.update_progress(info))
+```
 
 ### yt-dlp Integration
 ```python
 ydl_opts = {
-    'outtmpl': output_path,
     'format': format_selector,
-    'progress_hooks': [progress_callback],
+    'outtmpl': output_template,
+    'progress_hooks': [lambda d: self._progress_hook(d, video_id)],
+    'continuedl': True,  # Resume support
 }
 with yt_dlp.YoutubeDL(ydl_opts) as ydl:
     ydl.download([url])
 ```
 
-### Thread-safe GUI Updates
-```python
-# From worker thread
-self.progress_queue.put(('status', video_id, 'Downloading'))
-
-# In main thread (checked periodically)
-def check_progress_queue(self):
-    item = self.progress_queue.get_nowait()
-    # Update GUI here
-    self.root.after(100, self.check_progress_queue)
-```
-
 ## Platform Notes
 
 - Cross-platform (Windows, macOS, Linux)
-- File explorer opening uses platform-specific commands: `explorer`, `open`, `xdg-open`
+- File explorer: `os.startfile` (Windows), `open` (macOS), `xdg-open` (Linux)
+- Config stored in `~/.ytdownloader/` (cross-platform user home)
 - Filename sanitization handles OS-specific invalid characters

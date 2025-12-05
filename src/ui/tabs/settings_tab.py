@@ -89,6 +89,7 @@ class SettingsTab(ttk.Frame):
         self._build_subtitle_section()
         self._build_appearance_section()
         self._build_advanced_section()
+        self._build_update_section()
         self._build_buttons()
 
     def _build_download_section(self):
@@ -561,10 +562,89 @@ class SettingsTab(ttk.Frame):
             command=lambda: self._mark_changed("debug_mode")
         ).grid(row=row, column=0, columnspan=2, sticky="w", pady=5)
 
+    def _build_update_section(self):
+        """Build yt-dlp update settings section."""
+        section = ttk.LabelFrame(
+            self.scrollable_frame,
+            text="yt-dlp Updates",
+            padding=15
+        )
+        section.grid(row=5, column=0, sticky="ew", padx=10, pady=(0, 10))
+        section.columnconfigure(1, weight=1)
+
+        row = 0
+
+        # Current version display
+        ttk.Label(section, text="Current Version:").grid(
+            row=row, column=0, sticky="w", padx=(0, 10), pady=5
+        )
+
+        version_frame = ttk.Frame(section)
+        version_frame.grid(row=row, column=1, sticky="w", pady=5)
+
+        self.ytdlp_version_label = ttk.Label(
+            version_frame,
+            text="Loading...",
+            font=("", 9, "bold")
+        )
+        self.ytdlp_version_label.pack(side=tk.LEFT)
+
+        # Load version in background
+        self.after(100, self._load_ytdlp_version)
+
+        row += 1
+
+        # Auto-check updates
+        self.auto_update_check_var = tk.BooleanVar()
+        ttk.Checkbutton(
+            section,
+            text="Check for updates when application starts",
+            variable=self.auto_update_check_var,
+            command=lambda: self._mark_changed("auto_check_updates")
+        ).grid(row=row, column=0, columnspan=2, sticky="w", pady=5)
+
+        row += 1
+
+        # Update button
+        btn_frame = ttk.Frame(section)
+        btn_frame.grid(row=row, column=0, columnspan=2, sticky="w", pady=(10, 0))
+
+        ttk.Button(
+            btn_frame,
+            text="Check for Updates",
+            command=self._show_update_dialog
+        ).pack(side=tk.LEFT, padx=(0, 10))
+
+        ttk.Label(
+            btn_frame,
+            text="Keep yt-dlp updated for best YouTube compatibility",
+            style="Subtitle.TLabel"
+        ).pack(side=tk.LEFT)
+
+    def _load_ytdlp_version(self):
+        """Load yt-dlp version in background."""
+        import threading
+
+        def load_version():
+            try:
+                import yt_dlp
+                version = yt_dlp.version.__version__
+            except Exception:
+                version = "Unknown"
+            self.after(0, lambda: self.ytdlp_version_label.config(text=version))
+
+        thread = threading.Thread(target=load_version, daemon=True)
+        thread.start()
+
+    def _show_update_dialog(self):
+        """Show the yt-dlp update dialog."""
+        from src.ui.dialogs.update_dialog import show_update_dialog
+        show_update_dialog(self.winfo_toplevel())
+
     def _build_buttons(self):
         """Build action buttons."""
         btn_frame = ttk.Frame(self.scrollable_frame)
-        btn_frame.grid(row=5, column=0, sticky="ew", padx=10, pady=(0, 20))
+        btn_frame.grid(row=6, column=0, sticky="ew", padx=10, pady=(0, 20))
 
         # Save button
         self.save_btn = ttk.Button(
@@ -632,6 +712,9 @@ class SettingsTab(ttk.Frame):
         self.cookie_var.set(self.config.get("cookie_file", ""))
         self.debug_var.set(self.config.get("debug_mode", False))
 
+        # Update settings
+        self.auto_update_check_var.set(self.config.get("auto_check_updates", True))
+
         # Update subtitle controls state
         self._on_subtitles_toggled()
 
@@ -671,6 +754,9 @@ class SettingsTab(ttk.Frame):
         self.config.set("embed_thumbnail", self.thumbnail_var.get())
         self.config.set("cookie_file", self.cookie_var.get())
         self.config.set("debug_mode", self.debug_var.get())
+
+        # Update settings
+        self.config.set("auto_check_updates", self.auto_update_check_var.get())
 
         # Clear pending changes
         self._pending_changes.clear()

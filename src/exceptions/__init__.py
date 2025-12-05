@@ -10,6 +10,8 @@ from .errors import (
     DownloadError,
     ConfigurationError,
     FileSystemError,
+    ExtractionError,
+    PostProcessingError,
 )
 
 __all__ = [
@@ -22,4 +24,6 @@ __all__ = [
     'DownloadError',
     'ConfigurationError',
     'FileSystemError',
+    'ExtractionError',
+    'PostProcessingError',
 ]

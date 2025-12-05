@@ -145,7 +145,15 @@ class DownloadsTab(ttk.Frame):
             text="Download Subtitles",
             variable=self.subtitles_var,
             command=self._on_subtitles_changed
-        ).pack(side=tk.LEFT)
+        ).pack(side=tk.LEFT, padx=(0, 15))
+
+        # Preview Formats button
+        self.preview_formats_btn = ttk.Button(
+            options_frame,
+            text="Preview Formats",
+            command=self._show_format_preview
+        )
+        self.preview_formats_btn.pack(side=tk.LEFT)
 
     def _build_control_buttons(self):
         """Build control button section."""
@@ -310,8 +318,43 @@ class DownloadsTab(ttk.Frame):
 
     def _handle_urls_submitted(self, urls: List[str]):
         """Handle URLs submitted from input widget."""
-        if self.on_urls_submitted:
-            self.on_urls_submitted(urls)
+        from src.core.playlist_filter import PlaylistFilter
+
+        # Check if any URL is a playlist
+        playlist_urls = []
+        regular_urls = []
+
+        for url in urls:
+            if PlaylistFilter.is_playlist_url(url):
+                playlist_urls.append(url)
+            else:
+                regular_urls.append(url)
+
+        # Handle regular URLs immediately
+        if regular_urls and self.on_urls_submitted:
+            self.on_urls_submitted(regular_urls)
+
+        # Show playlist dialog for playlist URLs
+        for playlist_url in playlist_urls:
+            self._show_playlist_dialog(playlist_url)
+
+    def _show_playlist_dialog(self, url: str):
+        """Show playlist selection dialog.
+
+        Args:
+            url: Playlist URL
+        """
+        from src.ui.dialogs.playlist_dialog import show_playlist_dialog
+
+        def on_videos_selected(video_urls: List[str]):
+            if video_urls and self.on_urls_submitted:
+                self.on_urls_submitted(video_urls)
+
+        show_playlist_dialog(
+            self.winfo_toplevel(),
+            url=url,
+            on_select=on_videos_selected
+        )
 
     def _handle_remove(self, video_ids: List[str]):
         """Handle remove request from queue."""
@@ -347,3 +390,30 @@ class DownloadsTab(ttk.Frame):
         """Handle stop button click."""
         if self.on_stop_downloads:
             self.on_stop_downloads()
+
+    def _show_format_preview(self):
+        """Show format preview dialog for the current URL."""
+        url = self.url_input.get_url().strip()
+
+        if not url:
+            messagebox.showwarning(
+                "No URL",
+                "Please enter a YouTube URL first to preview available formats."
+            )
+            return
+
+        from src.ui.dialogs.format_dialog import show_format_dialog
+
+        def on_format_selected(format_id: str):
+            # Store the selected format for the next download
+            self._selected_format_id = format_id
+            messagebox.showinfo(
+                "Format Selected",
+                f"Format '{format_id}' selected. Add the URL to queue to download with this format."
+            )
+
+        show_format_dialog(
+            self.winfo_toplevel(),
+            url=url,
+            on_select=on_format_selected
+        )
