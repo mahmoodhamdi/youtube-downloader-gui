@@ -85,3 +85,6 @@ MIN_DISK_SPACE_GB = 1.0
 
 # Rate limiting
 DEFAULT_RATE_LIMIT_DELAY = 1.0  # seconds between requests
+
+# Update settings
+DEFAULT_AUTO_CHECK_UPDATES = True
