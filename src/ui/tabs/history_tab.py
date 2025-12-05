@@ -12,6 +12,8 @@ import json
 from dataclasses import dataclass, asdict
 from enum import Enum
 
+from src.ui.styled_widgets import StyledEntry, DRACULA
+
 
 class HistoryFilter(Enum):
     """Filter options for history."""
@@ -227,8 +229,8 @@ class HistoryTab(ttk.Frame):
         self.search_var = tk.StringVar()
         self.search_var.trace_add("write", self._on_search_changed)
 
-        search_entry = ttk.Entry(search_frame, textvariable=self.search_var, width=30)
-        search_entry.pack(side=tk.LEFT, padx=(0, 20))
+        search_entry = StyledEntry(search_frame, textvariable=self.search_var, width=30)
+        search_entry.pack(side=tk.LEFT, padx=(0, 20), ipady=3)
 
         # Filter dropdown
         ttk.Label(search_frame, text="Filter:").pack(side=tk.LEFT, padx=(0, 5))

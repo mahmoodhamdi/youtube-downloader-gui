@@ -43,11 +43,9 @@ SUBTITLE_LANGUAGES = [
     ("Hindi", "hi"),
 ]
 
-# Theme options
+# Theme options (dark mode only for eye comfort)
 THEME_OPTIONS = [
-    ("System Default", "system"),
-    ("Light", "light"),
-    ("Dark", "dark"),
+    ("Dark Mode", "dark"),
 ]
 
 # Download limits

@@ -10,6 +10,7 @@ from typing import Optional, Callable, List
 from src.core.format_selector import (
     FormatSelector, FormatInfo, VideoFormats, FormatType
 )
+from src.ui.styled_widgets import DRACULA
 
 
 class FormatDialog(tk.Toplevel):
@@ -61,6 +62,7 @@ class FormatDialog(tk.Toplevel):
         self.title("Select Format")
         self.geometry("800x550")
         self.minsize(700, 450)
+        self.configure(bg=DRACULA["bg"])
 
         # Center on parent
         self.transient(parent)

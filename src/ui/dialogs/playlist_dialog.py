@@ -10,6 +10,7 @@ from typing import Optional, Callable, List
 from src.core.playlist_filter import (
     PlaylistFilter, PlaylistInfo, PlaylistVideoInfo
 )
+from src.ui.styled_widgets import StyledEntry, DRACULA
 
 
 class PlaylistDialog(tk.Toplevel):
@@ -62,6 +63,7 @@ class PlaylistDialog(tk.Toplevel):
         self.title("Select Videos from Playlist")
         self.geometry("900x600")
         self.minsize(800, 500)
+        self.configure(bg=DRACULA["bg"])
 
         # Center on parent
         self.transient(parent)
@@ -119,7 +121,7 @@ class PlaylistDialog(tk.Toplevel):
         ttk.Label(filter_frame, text="Search:").grid(row=0, column=0, padx=(0, 5))
 
         self.search_var = tk.StringVar()
-        self.search_entry = ttk.Entry(filter_frame, textvariable=self.search_var, width=25)
+        self.search_entry = StyledEntry(filter_frame, textvariable=self.search_var, width=25)
         self.search_entry.grid(row=0, column=1, padx=(0, 15))
         self.search_entry.bind("<KeyRelease>", lambda e: self._apply_filters())
 
@@ -144,10 +146,10 @@ class PlaylistDialog(tk.Toplevel):
         range_frame.grid(row=0, column=5, sticky="w")
 
         self.start_var = tk.StringVar(value="1")
-        ttk.Entry(range_frame, textvariable=self.start_var, width=5).pack(side=tk.LEFT)
+        StyledEntry(range_frame, textvariable=self.start_var, width=5).pack(side=tk.LEFT)
         ttk.Label(range_frame, text=" to ").pack(side=tk.LEFT)
         self.end_var = tk.StringVar(value="")
-        ttk.Entry(range_frame, textvariable=self.end_var, width=5).pack(side=tk.LEFT)
+        StyledEntry(range_frame, textvariable=self.end_var, width=5).pack(side=tk.LEFT)
         ttk.Button(
             range_frame,
             text="Apply",

@@ -1,13 +1,12 @@
 """Theme management for YouTube Downloader.
 
-Provides light/dark theme support with system theme detection.
+Provides Dracula dark theme with eye-friendly colors.
 """
 
 import tkinter as tk
 from tkinter import ttk
 from typing import Dict, Any, Optional
 from dataclasses import dataclass
-import sys
 
 
 @dataclass
@@ -50,54 +49,44 @@ class Theme:
     separator: str
 
 
-# Light theme
-LIGHT_THEME = Theme(
-    name="light",
-    bg="#ffffff",
-    fg="#1a1a1a",
-    bg_secondary="#f5f5f5",
-    fg_secondary="#666666",
-    accent="#0078d4",
-    accent_hover="#106ebe",
-    accent_pressed="#005a9e",
-    success="#107c10",
-    warning="#ff8c00",
-    error="#d13438",
-    info="#0078d4",
-    input_bg="#ffffff",
-    input_fg="#1a1a1a",
-    input_border="#d1d1d1",
-    select_bg="#0078d4",
-    select_fg="#ffffff",
-    progress_bg="#e0e0e0",
-    progress_fg="#0078d4",
-    border="#d1d1d1",
-    separator="#e0e0e0",
-)
+# Dracula Theme - Popular eye-friendly dark theme
+# https://draculatheme.com/contribute
+DRACULA_THEME = Theme(
+    name="dracula",
 
-# Dark theme
-DARK_THEME = Theme(
-    name="dark",
-    bg="#1e1e1e",
-    fg="#ffffff",
-    bg_secondary="#2d2d2d",
-    fg_secondary="#a0a0a0",
-    accent="#0078d4",
-    accent_hover="#1a8cff",
-    accent_pressed="#005a9e",
-    success="#6ccb5f",
-    warning="#ffb900",
-    error="#f85149",
-    info="#58a6ff",
-    input_bg="#2d2d2d",
-    input_fg="#ffffff",
-    input_border="#3d3d3d",
-    select_bg="#0078d4",
-    select_fg="#ffffff",
-    progress_bg="#3d3d3d",
-    progress_fg="#0078d4",
-    border="#3d3d3d",
-    separator="#3d3d3d",
+    # Main colors
+    bg="#282a36",              # Background
+    fg="#f8f8f2",              # Foreground (white)
+    bg_secondary="#44475a",    # Current Line / Selection background
+    fg_secondary="#6272a4",    # Comment (muted purple-blue)
+
+    # Accent colors - Purple (Dracula signature)
+    accent="#bd93f9",          # Purple
+    accent_hover="#caa9fa",    # Lighter purple on hover
+    accent_pressed="#9d7cd4",  # Darker purple when pressed
+
+    # Status colors
+    success="#50fa7b",         # Green
+    warning="#ffb86c",         # Orange
+    error="#ff5555",           # Red
+    info="#8be9fd",            # Cyan
+
+    # Input colors
+    input_bg="#21222c",        # Slightly darker than bg
+    input_fg="#f8f8f2",        # White text
+    input_border="#44475a",    # Current line color
+
+    # Selection colors
+    select_bg="#44475a",       # Current Line
+    select_fg="#f8f8f2",       # White text
+
+    # Progress colors
+    progress_bg="#44475a",     # Current Line
+    progress_fg="#bd93f9",     # Purple
+
+    # Border and separator
+    border="#44475a",          # Current Line
+    separator="#44475a",       # Current Line
 )
 
 
@@ -105,10 +94,9 @@ class ThemeManager:
     """Manages application themes and styling.
 
     Features:
-    - Light/Dark/System theme support
-    - Dynamic theme switching
+    - Dracula dark theme
     - ttk style configuration
-    - System theme detection
+    - Consistent styling across all widgets
 
     Usage:
         theme_manager = ThemeManager(root)
@@ -116,8 +104,10 @@ class ThemeManager:
     """
 
     THEMES = {
-        "light": LIGHT_THEME,
-        "dark": DARK_THEME,
+        "dark": DRACULA_THEME,
+        "dracula": DRACULA_THEME,
+        "system": DRACULA_THEME,
+        "light": DRACULA_THEME,
     }
 
     def __init__(self, root: tk.Tk):
@@ -128,22 +118,23 @@ class ThemeManager:
         """
         self.root = root
         self.style = ttk.Style()
+
+        # Use 'clam' theme as base - better support for custom colors on Windows
+        try:
+            self.style.theme_use('clam')
+        except Exception:
+            pass
+
         self._current_theme: Optional[Theme] = None
         self._callbacks: list = []
 
-    def set_theme(self, theme_name: str):
+    def set_theme(self, theme_name: str = "dark"):
         """Set the application theme.
 
         Args:
-            theme_name: 'light', 'dark', or 'system'
+            theme_name: Theme name (always uses Dracula theme)
         """
-        if theme_name == "system":
-            theme_name = self._detect_system_theme()
-
-        if theme_name not in self.THEMES:
-            theme_name = "light"
-
-        theme = self.THEMES[theme_name]
+        theme = DRACULA_THEME
         self._current_theme = theme
 
         # Apply theme
@@ -156,36 +147,6 @@ class ThemeManager:
             except Exception:
                 pass
 
-    def _detect_system_theme(self) -> str:
-        """Detect system dark/light mode.
-
-        Returns:
-            'dark' or 'light'
-        """
-        try:
-            if sys.platform == "win32":
-                import winreg
-                key = winreg.OpenKey(
-                    winreg.HKEY_CURRENT_USER,
-                    r"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize"
-                )
-                value, _ = winreg.QueryValueEx(key, "AppsUseLightTheme")
-                winreg.CloseKey(key)
-                return "light" if value else "dark"
-
-            elif sys.platform == "darwin":
-                import subprocess
-                result = subprocess.run(
-                    ["defaults", "read", "-g", "AppleInterfaceStyle"],
-                    capture_output=True, text=True
-                )
-                return "dark" if "Dark" in result.stdout else "light"
-
-        except Exception:
-            pass
-
-        return "light"
-
     def _apply_theme(self, theme: Theme):
         """Apply theme to all widgets.
 
@@ -194,6 +155,12 @@ class ThemeManager:
         """
         # Configure root window
         self.root.configure(bg=theme.bg)
+
+        # Configure root window options for native widgets (e.g., Combobox dropdown)
+        self.root.option_add("*TCombobox*Listbox.background", theme.input_bg)
+        self.root.option_add("*TCombobox*Listbox.foreground", theme.input_fg)
+        self.root.option_add("*TCombobox*Listbox.selectBackground", theme.select_bg)
+        self.root.option_add("*TCombobox*Listbox.selectForeground", theme.select_fg)
 
         # Configure ttk styles
         self._configure_ttk_styles(theme)
@@ -223,6 +190,11 @@ class ThemeManager:
             background=theme.bg_secondary
         )
 
+        style.configure("Card.TFrame",
+            background=theme.bg_secondary,
+            relief="flat"
+        )
+
         # Label
         style.configure("TLabel",
             background=theme.bg,
@@ -240,26 +212,42 @@ class ThemeManager:
         )
 
         style.configure("Success.TLabel",
-            foreground=theme.success
+            foreground=theme.success,
+            background=theme.bg
         )
 
         style.configure("Warning.TLabel",
-            foreground=theme.warning
+            foreground=theme.warning,
+            background=theme.bg
         )
 
         style.configure("Error.TLabel",
-            foreground=theme.error
+            foreground=theme.error,
+            background=theme.bg
         )
 
         style.configure("Info.TLabel",
-            foreground=theme.info
+            foreground=theme.info,
+            background=theme.bg
+        )
+
+        # Pink accent label (Dracula pink)
+        style.configure("Pink.TLabel",
+            foreground="#ff79c6",
+            background=theme.bg
+        )
+
+        # Cyan accent label
+        style.configure("Cyan.TLabel",
+            foreground="#8be9fd",
+            background=theme.bg
         )
 
         # Button
         style.configure("TButton",
             background=theme.bg_secondary,
             foreground=theme.fg,
-            padding=(10, 5),
+            padding=(12, 6),
             font=("Segoe UI", 10)
         )
 
@@ -275,7 +263,7 @@ class ThemeManager:
 
         style.configure("Accent.TButton",
             background=theme.accent,
-            foreground="#ffffff",
+            foreground=theme.bg,
             font=("Segoe UI", 10, "bold")
         )
 
@@ -286,12 +274,41 @@ class ThemeManager:
             ]
         )
 
+        # Pink button (Dracula pink)
+        style.configure("Pink.TButton",
+            background="#ff79c6",
+            foreground=theme.bg,
+            font=("Segoe UI", 10, "bold")
+        )
+
+        style.map("Pink.TButton",
+            background=[
+                ("active", "#ff92d0"),
+                ("pressed", "#d160a2")
+            ]
+        )
+
+        style.configure("Success.TButton",
+            background=theme.success,
+            foreground=theme.bg
+        )
+
+        style.configure("Danger.TButton",
+            background=theme.error,
+            foreground=theme.bg
+        )
+
         # Entry
         style.configure("TEntry",
             fieldbackground=theme.input_bg,
             foreground=theme.input_fg,
             insertcolor=theme.fg,
-            padding=5
+            padding=8
+        )
+
+        style.map("TEntry",
+            fieldbackground=[("focus", theme.bg_secondary)],
+            bordercolor=[("focus", theme.accent)]
         )
 
         # Combobox
@@ -299,7 +316,7 @@ class ThemeManager:
             fieldbackground=theme.input_bg,
             foreground=theme.input_fg,
             arrowcolor=theme.fg,
-            padding=5
+            padding=8
         )
 
         style.map("TCombobox",
@@ -324,12 +341,16 @@ class ThemeManager:
             foreground=theme.fg
         )
 
+        style.map("TRadiobutton",
+            background=[("active", theme.bg)]
+        )
+
         # Spinbox
         style.configure("TSpinbox",
             fieldbackground=theme.input_bg,
             foreground=theme.input_fg,
             arrowcolor=theme.fg,
-            padding=5
+            padding=8
         )
 
         # LabelFrame
@@ -340,7 +361,7 @@ class ThemeManager:
 
         style.configure("TLabelframe.Label",
             background=theme.bg,
-            foreground=theme.fg,
+            foreground="#ff79c6",  # Dracula pink for labels
             font=("Segoe UI", 10, "bold")
         )
 
@@ -363,7 +384,7 @@ class ThemeManager:
                 ("active", theme.bg)
             ],
             foreground=[
-                ("selected", theme.accent)
+                ("selected", "#ff79c6")  # Dracula pink for selected tab
             ],
             expand=[("selected", [1, 1, 1, 0])]
         )
@@ -373,7 +394,7 @@ class ThemeManager:
             background=theme.bg,
             foreground=theme.fg,
             fieldbackground=theme.bg,
-            rowheight=30,
+            rowheight=32,
             font=("Segoe UI", 10)
         )
 
@@ -388,22 +409,31 @@ class ThemeManager:
             foreground=[("selected", theme.select_fg)]
         )
 
-        # Configure treeview tag colors
-        # These will be used in the queue widget
-
-        # Progressbar
+        # Progressbar - Purple (Dracula accent)
         style.configure("TProgressbar",
             background=theme.progress_fg,
             troughcolor=theme.progress_bg,
             thickness=20
         )
 
+        # Green progress for success
         style.configure("Success.Horizontal.TProgressbar",
             background=theme.success
         )
 
+        # Red progress for error
         style.configure("Error.Horizontal.TProgressbar",
             background=theme.error
+        )
+
+        # Pink progress (Dracula pink)
+        style.configure("Pink.Horizontal.TProgressbar",
+            background="#ff79c6"
+        )
+
+        # Cyan progress
+        style.configure("Cyan.Horizontal.TProgressbar",
+            background="#8be9fd"
         )
 
         # Scrollbar
@@ -411,6 +441,10 @@ class ThemeManager:
             background=theme.bg_secondary,
             troughcolor=theme.bg,
             arrowcolor=theme.fg
+        )
+
+        style.map("TScrollbar",
+            background=[("active", theme.accent)]
         )
 
         # Separator
@@ -422,6 +456,16 @@ class ThemeManager:
         style.configure("TScale",
             background=theme.bg,
             troughcolor=theme.progress_bg
+        )
+
+        # Panedwindow
+        style.configure("TPanedwindow",
+            background=theme.bg
+        )
+
+        # Sizegrip
+        style.configure("TSizegrip",
+            background=theme.bg
         )
 
     @property
@@ -439,8 +483,8 @@ class ThemeManager:
             Color hex code
         """
         if self._current_theme:
-            return getattr(self._current_theme, color_name, "#000000")
-        return "#000000"
+            return getattr(self._current_theme, color_name, "#f8f8f2")
+        return "#f8f8f2"
 
     def add_callback(self, callback):
         """Add theme change callback.
@@ -454,3 +498,19 @@ class ThemeManager:
         """Remove theme change callback."""
         if callback in self._callbacks:
             self._callbacks.remove(callback)
+
+
+# Export Dracula colors for use elsewhere
+DRACULA_COLORS = {
+    "background": "#282a36",
+    "current_line": "#44475a",
+    "foreground": "#f8f8f2",
+    "comment": "#6272a4",
+    "cyan": "#8be9fd",
+    "green": "#50fa7b",
+    "orange": "#ffb86c",
+    "pink": "#ff79c6",
+    "purple": "#bd93f9",
+    "red": "#ff5555",
+    "yellow": "#f1fa8c",
+}

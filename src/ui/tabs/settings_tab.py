@@ -13,6 +13,7 @@ from src.config.defaults import (
     MAX_CONCURRENT_DOWNLOADS, MIN_CONCURRENT_DOWNLOADS,
     MAX_RETRY_ATTEMPTS, MIN_RETRY_ATTEMPTS
 )
+from src.ui.styled_widgets import StyledEntry, StyledSpinbox, DRACULA
 
 
 class SettingsTab(ttk.Frame):
@@ -114,8 +115,8 @@ class SettingsTab(ttk.Frame):
         path_frame.columnconfigure(0, weight=1)
 
         self.path_var = tk.StringVar()
-        self.path_entry = ttk.Entry(path_frame, textvariable=self.path_var)
-        self.path_entry.grid(row=0, column=0, sticky="ew", padx=(0, 5))
+        self.path_entry = StyledEntry(path_frame, textvariable=self.path_var)
+        self.path_entry.grid(row=0, column=0, sticky="ew", padx=(0, 5), ipady=4)
 
         ttk.Button(
             path_frame,
@@ -189,8 +190,8 @@ class SettingsTab(ttk.Frame):
         template_frame.columnconfigure(0, weight=1)
 
         self.template_var = tk.StringVar()
-        self.template_entry = ttk.Entry(template_frame, textvariable=self.template_var)
-        self.template_entry.grid(row=0, column=0, sticky="ew", padx=(0, 5))
+        self.template_entry = StyledEntry(template_frame, textvariable=self.template_var)
+        self.template_entry.grid(row=0, column=0, sticky="ew", padx=(0, 5), ipady=4)
         self.template_entry.bind("<FocusOut>", lambda e: self._mark_changed("filename_template"))
 
         ttk.Button(
@@ -232,7 +233,7 @@ class SettingsTab(ttk.Frame):
         concurrent_frame.grid(row=row, column=1, sticky="w", pady=5)
 
         self.concurrent_var = tk.IntVar()
-        concurrent_spin = ttk.Spinbox(
+        concurrent_spin = StyledSpinbox(
             concurrent_frame,
             from_=MIN_CONCURRENT_DOWNLOADS,
             to=MAX_CONCURRENT_DOWNLOADS,
@@ -256,7 +257,7 @@ class SettingsTab(ttk.Frame):
         )
 
         self.retry_var = tk.IntVar()
-        retry_spin = ttk.Spinbox(
+        retry_spin = StyledSpinbox(
             section,
             from_=MIN_RETRY_ATTEMPTS,
             to=MAX_RETRY_ATTEMPTS,
@@ -277,7 +278,7 @@ class SettingsTab(ttk.Frame):
         rate_frame.grid(row=row, column=1, sticky="w", pady=5)
 
         self.rate_limit_var = tk.IntVar()
-        rate_spin = ttk.Spinbox(
+        rate_spin = StyledSpinbox(
             rate_frame,
             from_=0,
             to=100000,
@@ -301,8 +302,8 @@ class SettingsTab(ttk.Frame):
         )
 
         self.proxy_var = tk.StringVar()
-        proxy_entry = ttk.Entry(section, textvariable=self.proxy_var, width=40)
-        proxy_entry.grid(row=row, column=1, sticky="w", pady=5)
+        proxy_entry = StyledEntry(section, textvariable=self.proxy_var, width=40)
+        proxy_entry.grid(row=row, column=1, sticky="w", pady=5, ipady=4)
         proxy_entry.bind("<FocusOut>", lambda e: self._mark_changed("proxy"))
 
         row += 1
@@ -395,11 +396,11 @@ class SettingsTab(ttk.Frame):
         theme_frame.grid(row=row, column=1, sticky="w", pady=5)
 
         self.theme_var = tk.StringVar()
-        for theme in THEME_OPTIONS:
+        for label, value in THEME_OPTIONS:
             ttk.Radiobutton(
                 theme_frame,
-                text=theme.title(),
-                value=theme,
+                text=label,
+                value=value,
                 variable=self.theme_var,
                 command=self._on_theme_changed
             ).pack(side=tk.LEFT, padx=(0, 15))
@@ -416,7 +417,7 @@ class SettingsTab(ttk.Frame):
 
         ttk.Label(size_frame, text="Width:").pack(side=tk.LEFT)
         self.width_var = tk.IntVar()
-        ttk.Spinbox(
+        StyledSpinbox(
             size_frame,
             from_=800,
             to=2560,
@@ -426,7 +427,7 @@ class SettingsTab(ttk.Frame):
 
         ttk.Label(size_frame, text="Height:").pack(side=tk.LEFT)
         self.height_var = tk.IntVar()
-        ttk.Spinbox(
+        StyledSpinbox(
             size_frame,
             from_=600,
             to=1440,
@@ -478,8 +479,8 @@ class SettingsTab(ttk.Frame):
         ffmpeg_frame.columnconfigure(0, weight=1)
 
         self.ffmpeg_var = tk.StringVar()
-        ttk.Entry(ffmpeg_frame, textvariable=self.ffmpeg_var).grid(
-            row=0, column=0, sticky="ew", padx=(0, 5)
+        StyledEntry(ffmpeg_frame, textvariable=self.ffmpeg_var).grid(
+            row=0, column=0, sticky="ew", padx=(0, 5), ipady=4
         )
 
         ttk.Button(
@@ -533,8 +534,8 @@ class SettingsTab(ttk.Frame):
         cookie_frame.columnconfigure(0, weight=1)
 
         self.cookie_var = tk.StringVar()
-        ttk.Entry(cookie_frame, textvariable=self.cookie_var).grid(
-            row=0, column=0, sticky="ew", padx=(0, 5)
+        StyledEntry(cookie_frame, textvariable=self.cookie_var).grid(
+            row=0, column=0, sticky="ew", padx=(0, 5), ipady=4
         )
 
         ttk.Button(

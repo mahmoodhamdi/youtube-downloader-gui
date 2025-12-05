@@ -56,7 +56,7 @@ class MainWindow:
         self._connect_signals()
 
         # Apply theme
-        self.theme_manager.apply_theme(self.root)
+        self.theme_manager.set_theme(self.config_manager.get("theme", "system"))
 
         # Log startup
         self.logger.info(f"{self.APP_NAME} v{self.APP_VERSION} started")
@@ -70,17 +70,31 @@ class MainWindow:
 
         # Logger
         log_dir = os.path.join(config_dir, "logs")
+        os.makedirs(log_dir, exist_ok=True)
         self.logger = Logger(log_dir)
 
-        # Theme manager
-        self.theme_manager = ThemeManager(self.config_manager)
+        # Theme manager (needs root, not config_manager)
+        self.theme_manager = ThemeManager(self.root)
 
         # Queue manager
         self.queue_manager = QueueManager()
 
+        # Download options
+        self.download_options = DownloadOptions(
+            output_path=self.config_manager.get("download_path", os.path.expanduser("~/Downloads")),
+            quality=self.config_manager.get("quality", "best"),
+            include_subtitles=self.config_manager.get("include_subtitles", False),
+            subtitle_langs=[self.config_manager.get("subtitle_language", "en")],
+            embed_subtitles=self.config_manager.get("embed_subtitles", False),
+            embed_thumbnail=self.config_manager.get("embed_thumbnail", False),
+            add_metadata=self.config_manager.get("add_metadata", True),
+        )
+
         # Download manager
         self.download_manager = DownloadManager(
-            download_path=self.config_manager.get("download_path", os.path.expanduser("~/Downloads")),
+            queue=self.queue_manager,
+            options=self.download_options,
+            logger=self.logger,
             max_concurrent=self.config_manager.get("max_concurrent_downloads", 2)
         )
 
@@ -224,7 +238,7 @@ class MainWindow:
         # Download manager callbacks
         self.download_manager.on_progress = self._on_download_progress
         self.download_manager.on_complete = self._on_download_complete
-        self.download_manager.on_error = self._on_download_error
+        self.download_manager.on_all_complete = self._on_all_downloads_complete
 
     # URL handling
 
@@ -301,18 +315,14 @@ class MainWindow:
         self.downloads_tab.set_downloading_state(True)
         self.status_bar.info("Starting downloads...")
 
-        # Build download options
-        options = DownloadOptions(
-            quality=self.config_manager.get("quality", "best"),
-            format=self.config_manager.get("preferred_format", "mp4"),
-            subtitles=self.config_manager.get("include_subtitles", False),
-            subtitle_lang=self.config_manager.get("subtitle_language", "en"),
-            output_template=self.config_manager.get("filename_template", "%(title)s.%(ext)s")
-        )
+        # Update download options from current settings
+        self.download_options.output_path = self.config_manager.get("download_path", os.path.expanduser("~/Downloads"))
+        self.download_options.quality = self.config_manager.get("quality", "best")
+        self.download_options.include_subtitles = self.config_manager.get("include_subtitles", False)
+        self.download_options.subtitle_langs = [self.config_manager.get("subtitle_language", "en")]
 
-        # Start downloads
-        for video in queued:
-            self.download_manager.download(video, options)
+        # Start the download manager
+        self.download_manager.start()
 
     def _pause_downloads(self):
         """Pause active downloads."""
@@ -349,15 +359,9 @@ class MainWindow:
 
     # Download callbacks
 
-    def _on_download_progress(self, video_id: str, progress: DownloadProgress):
+    def _on_download_progress(self, progress: DownloadProgress):
         """Handle download progress update."""
-        # Update queue item
-        self.queue_manager.update_progress(video_id, progress.percent)
-
-        if progress.status == "downloading":
-            self.queue_manager.update_status(video_id, VideoStatus.DOWNLOADING)
-        elif progress.status == "processing":
-            self.queue_manager.update_status(video_id, VideoStatus.POST_PROCESSING)
+        video_id = progress.video_id
 
         # Update progress widget
         video = self.queue_manager.get(video_id)
@@ -373,11 +377,11 @@ class MainWindow:
             completed = len(self.queue_manager.get_by_status(VideoStatus.COMPLETED))
 
             info = ProgressInfo(
-                current_percent=progress.percent,
+                current_percent=progress.progress,
                 overall_percent=overall,
                 speed=progress.speed,
                 eta=progress.eta,
-                downloaded=progress.downloaded,
+                downloaded=progress.downloaded_bytes,
                 current_title=video.title,
                 active_downloads=active,
                 queued_count=queued,
@@ -386,14 +390,10 @@ class MainWindow:
 
             self.root.after(0, lambda: self.downloads_tab.update_progress(info))
 
-    def _on_download_complete(self, video_id: str, filepath: str):
+    def _on_download_complete(self, video: VideoItem, success: bool):
         """Handle download completion."""
-        self.queue_manager.update_status(video_id, VideoStatus.COMPLETED)
-        self.queue_manager.update_progress(video_id, 100.0)
-
-        video = self.queue_manager.get(video_id)
-        if video:
-            self.status_bar.success(f"Downloaded: {video.title}")
+        if success:
+            self.root.after(0, lambda: self.status_bar.success(f"Downloaded: {video.title}"))
 
             # Add to history
             entry = HistoryEntry(
@@ -403,35 +403,17 @@ class MainWindow:
                 uploader=video.uploader,
                 duration=video.duration,
                 filesize=video.filesize,
-                filepath=filepath,
+                filepath=self.download_options.output_path,
                 quality=self.config_manager.get("quality", "best"),
                 status="completed",
                 error_message="",
                 download_date=datetime.now().isoformat(),
                 thumbnail_url=video.thumbnail_url
             )
-            self.history_tab.add_entry(entry)
-
-        # Check if all downloads complete
-        active = self.queue_manager.get_by_status(VideoStatus.DOWNLOADING)
-        queued = self.queue_manager.get_by_status(VideoStatus.QUEUED)
-
-        if not active and not queued:
-            self.downloads_tab.set_downloading_state(False)
-            self.status_bar.success("All downloads completed!")
-
-            # Show notification if enabled
-            if self.config_manager.get("show_notifications", True):
-                self._show_notification("Downloads Complete", "All downloads have finished.")
-
-    def _on_download_error(self, video_id: str, error: str):
-        """Handle download error."""
-        self.queue_manager.update_status(video_id, VideoStatus.ERROR)
-
-        video = self.queue_manager.get(video_id)
-        if video:
-            video.error_message = error
-            self.status_bar.error(f"Failed: {video.title} - {error}")
+            self.root.after(0, lambda: self.history_tab.add_entry(entry))
+        else:
+            error = video.error_message or "Download failed"
+            self.root.after(0, lambda: self.status_bar.error(f"Failed: {video.title} - {error}"))
 
             # Add to history as failed
             entry = HistoryEntry(
@@ -448,7 +430,16 @@ class MainWindow:
                 download_date=datetime.now().isoformat(),
                 thumbnail_url=video.thumbnail_url
             )
-            self.history_tab.add_entry(entry)
+            self.root.after(0, lambda: self.history_tab.add_entry(entry))
+
+    def _on_all_downloads_complete(self):
+        """Handle all downloads complete."""
+        self.root.after(0, lambda: self.downloads_tab.set_downloading_state(False))
+        self.root.after(0, lambda: self.status_bar.success("All downloads completed!"))
+
+        # Show notification if enabled
+        if self.config_manager.get("show_notifications", True):
+            self._show_notification("Downloads Complete", "All downloads have finished.")
 
     # Queue management
 
@@ -473,15 +464,21 @@ class MainWindow:
     def _handle_theme_changed(self, theme: str):
         """Handle theme change."""
         self.theme_manager.set_theme(theme)
-        self.theme_manager.apply_theme(self.root)
+        self.config_manager.set("theme", theme)
 
     def _handle_settings_changed(self, key: str, value):
         """Handle settings change."""
-        # Update download manager if relevant
+        # Update download options if relevant
         if key == "download_path":
-            self.download_manager.set_download_path(value)
+            self.download_options.output_path = value
         elif key == "max_concurrent_downloads":
-            self.download_manager.set_max_concurrent(value)
+            self.download_manager.max_concurrent = value
+        elif key == "quality":
+            self.download_options.quality = value
+        elif key == "include_subtitles":
+            self.download_options.include_subtitles = value
+        elif key == "subtitle_language":
+            self.download_options.subtitle_langs = [value]
 
     # Menu actions
 

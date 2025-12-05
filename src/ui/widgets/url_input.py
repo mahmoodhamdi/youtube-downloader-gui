@@ -8,6 +8,15 @@ from tkinter import ttk, messagebox
 from typing import Callable, List, Optional
 import threading
 
+# Dracula theme colors for tk widgets
+DRACULA = {
+    "bg": "#282a36",
+    "fg": "#f8f8f2",
+    "input_bg": "#21222c",
+    "selection": "#44475a",
+    "cursor": "#f8f8f2",
+}
+
 
 class URLInputWidget(ttk.Frame):
     """Widget for URL input with validation.
@@ -58,8 +67,22 @@ class URLInputWidget(ttk.Frame):
         self.url_var = tk.StringVar()
         self.url_var.trace_add("write", self._on_url_changed)
 
-        self.url_entry = ttk.Entry(single_frame, textvariable=self.url_var)
-        self.url_entry.grid(row=0, column=1, sticky="ew", padx=(0, 5))
+        # Use tk.Entry with dark colors instead of ttk.Entry
+        self.url_entry = tk.Entry(
+            single_frame,
+            textvariable=self.url_var,
+            bg=DRACULA["input_bg"],
+            fg=DRACULA["fg"],
+            insertbackground=DRACULA["cursor"],
+            selectbackground=DRACULA["selection"],
+            selectforeground=DRACULA["fg"],
+            relief="flat",
+            font=("Segoe UI", 10),
+            highlightthickness=1,
+            highlightcolor="#bd93f9",
+            highlightbackground="#44475a"
+        )
+        self.url_entry.grid(row=0, column=1, sticky="ew", padx=(0, 5), ipady=5)
         self.url_entry.bind("<Return>", self._on_add_single)
         self.url_entry.bind("<Control-v>", self._on_paste)
 
@@ -95,9 +118,18 @@ class URLInputWidget(ttk.Frame):
             text_frame,
             height=4,
             wrap=tk.WORD,
-            font=("Consolas", 10)
+            font=("Consolas", 10),
+            bg=DRACULA["input_bg"],
+            fg=DRACULA["fg"],
+            insertbackground=DRACULA["cursor"],
+            selectbackground=DRACULA["selection"],
+            selectforeground=DRACULA["fg"],
+            relief="flat",
+            highlightthickness=1,
+            highlightcolor="#bd93f9",
+            highlightbackground="#44475a"
         )
-        self.multi_text.grid(row=0, column=0, sticky="ew")
+        self.multi_text.grid(row=0, column=0, sticky="ew", pady=2)
 
         scrollbar = ttk.Scrollbar(text_frame, orient=tk.VERTICAL, command=self.multi_text.yview)
         scrollbar.grid(row=0, column=1, sticky="ns")
