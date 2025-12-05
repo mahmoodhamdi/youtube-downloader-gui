@@ -8,6 +8,8 @@ from tkinter import ttk
 from typing import Optional, Callable, List
 from enum import Enum
 
+from src.ui.styled_widgets import StyledEntry, DRACULA
+
 
 class QueueFilterStatus(Enum):
     """Filter options for queue status."""
@@ -62,12 +64,12 @@ class QueueSearchWidget(ttk.Frame):
         self.search_var = tk.StringVar()
         self.search_var.trace_add("write", self._on_search_changed)
 
-        self.search_entry = ttk.Entry(self, textvariable=self.search_var, width=30)
+        self.search_entry = StyledEntry(self, textvariable=self.search_var, width=30)
         self.search_entry.grid(row=0, column=1, sticky="ew", padx=(0, 10))
 
         # Placeholder text
         self.search_entry.insert(0, "Search by title...")
-        self.search_entry.config(foreground="gray")
+        self.search_entry.config(fg=DRACULA["selection"])  # Gray-ish placeholder color
         self.search_entry.bind("<FocusIn>", self._on_search_focus_in)
         self.search_entry.bind("<FocusOut>", self._on_search_focus_out)
 
@@ -133,13 +135,13 @@ class QueueSearchWidget(ttk.Frame):
         """Handle search entry focus in."""
         if self.search_entry.get() == "Search by title...":
             self.search_entry.delete(0, tk.END)
-            self.search_entry.config(foreground="black")
+            self.search_entry.config(fg=DRACULA["fg"])
 
     def _on_search_focus_out(self, event):
         """Handle search entry focus out."""
         if not self.search_entry.get():
             self.search_entry.insert(0, "Search by title...")
-            self.search_entry.config(foreground="gray")
+            self.search_entry.config(fg=DRACULA["selection"])
 
     def _on_search_changed(self, *args):
         """Handle search text change with debounce."""
@@ -167,7 +169,7 @@ class QueueSearchWidget(ttk.Frame):
         self.search_var.set("")
         self.search_entry.delete(0, tk.END)
         self.search_entry.insert(0, "Search by title...")
-        self.search_entry.config(foreground="gray")
+        self.search_entry.config(fg=DRACULA["selection"])
 
         self.status_var.set("All")
         self.sort_var.set("Date Added")
@@ -226,7 +228,7 @@ class QueueSearchWidget(ttk.Frame):
         self.search_entry.focus_set()
         if self.search_entry.get() == "Search by title...":
             self.search_entry.delete(0, tk.END)
-            self.search_entry.config(foreground="black")
+            self.search_entry.config(fg=DRACULA["fg"])
 
 
 class QueueFilter:

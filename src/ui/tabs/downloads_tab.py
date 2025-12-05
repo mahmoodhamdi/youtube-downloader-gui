@@ -12,6 +12,7 @@ from src.ui.widgets.url_input import URLInputWidget
 from src.ui.widgets.queue_widget import QueueWidget
 from src.ui.widgets.progress_widget import ProgressWidget, ProgressInfo
 from src.core.queue_manager import VideoItem, VideoStatus
+from src.ui.styled_widgets import StyledEntry, StyledSpinbox, DRACULA
 
 
 class DownloadsTab(ttk.Frame):
@@ -93,7 +94,7 @@ class DownloadsTab(ttk.Frame):
         path_frame.columnconfigure(0, weight=1)
 
         self.path_var = tk.StringVar(value=self.config.get("download_path", ""))
-        self.path_entry = ttk.Entry(path_frame, textvariable=self.path_var, state="readonly")
+        self.path_entry = StyledEntry(path_frame, textvariable=self.path_var, state="readonly")
         self.path_entry.grid(row=0, column=0, sticky="ew", padx=(0, 5))
 
         ttk.Button(
@@ -128,7 +129,7 @@ class DownloadsTab(ttk.Frame):
         ttk.Label(options_frame, text="Concurrent:").pack(side=tk.LEFT, padx=(0, 5))
 
         self.concurrent_var = tk.IntVar(value=self.config.get("max_concurrent_downloads", 2))
-        concurrent_spin = ttk.Spinbox(
+        concurrent_spin = StyledSpinbox(
             options_frame,
             from_=1,
             to=5,
