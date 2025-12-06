@@ -8,7 +8,9 @@
       "Bash(del \"D:\\youtube-downloader-gui\\youtube_downloader.py\")",
       "Bash(ls:*)",
       "Bash(python:*)",
-      "Bash(pip install:*)"
+      "Bash(pip install:*)",
+      "Bash(cd:*)",
+      "Bash(batsbuild_installer.bat)"
     ],
     "deny": [],
     "ask": []
