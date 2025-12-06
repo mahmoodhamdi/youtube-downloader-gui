@@ -10,7 +10,11 @@
       "Bash(python:*)",
       "Bash(pip install:*)",
       "Bash(cd:*)",
-      "Bash(batsbuild_installer.bat)"
+      "Bash(batsbuild_installer.bat)",
+      "Bash(cmd.exe /c \"cd /d D:\\youtube-downloader-gui && bats\\build_installer.bat\")",
+      "Bash(powershell -Command \"Set-Location ''D:\\youtube-downloader-gui''; cmd /c ''bats\\build_installer.bat''\")",
+      "Bash(powershell -Command \"Remove-Item 'D:\\youtube-downloader-gui\\installer\\Output\\YouTubeDownloaderPro-Setup.exe' -Force -ErrorAction SilentlyContinue; Set-Location 'D:\\youtube-downloader-gui'; cmd /c 'bats\\build_installer.bat'\":*)",
+      "Bash(powershell:*)"
     ],
     "deny": [],
     "ask": []
