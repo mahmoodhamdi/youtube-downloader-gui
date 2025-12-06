@@ -1,5 +1,6 @@
 ; YouTube Downloader Pro Installer Script
 ; Inno Setup Script for creating Windows installer
+; With automatic FFmpeg download support
 
 #define MyAppName "YouTube Downloader Pro"
 #define MyAppVersion GetEnv('AppVersion')
@@ -53,11 +54,14 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
-Name: "quicklaunchicon"; Description: "{cm:CreateQuickLaunchIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked; OnlyBelowVersion: 6.1; Check: not IsAdminInstallMode
+Name: "installffmpeg"; Description: "Download and install FFmpeg (recommended for best quality)"; GroupDescription: "Additional Components:"; Flags: unchecked
 
 [Files]
 ; Main application files
 Source: "..\dist\YouTubeDownloaderPro\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+
+; FFmpeg installer script
+Source: "scripts\install_ffmpeg.ps1"; DestDir: "{app}\scripts"; Flags: ignoreversion
 
 ; Documentation
 Source: "..\README.md"; DestDir: "{app}"; Flags: ignoreversion; DestName: "README.txt"
@@ -65,32 +69,127 @@ Source: "..\LICENSE"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesnte
 
 [Icons]
 Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
+Name: "{group}\Install FFmpeg"; Filename: "powershell.exe"; Parameters: "-ExecutionPolicy Bypass -File ""{app}\scripts\install_ffmpeg.ps1"""; WorkingDir: "{app}\scripts"
 Name: "{group}\{cm:UninstallProgram,{#MyAppName}}"; Filename: "{uninstallexe}"
 Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
-Name: "{userappdata}\Microsoft\Internet Explorer\Quick Launch\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: quicklaunchicon
 
 [Run]
+; Install FFmpeg if selected
+Filename: "powershell.exe"; Parameters: "-ExecutionPolicy Bypass -File ""{app}\scripts\install_ffmpeg.ps1"""; StatusMsg: "Installing FFmpeg..."; Flags: runhidden; Tasks: installffmpeg
+; Launch application
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent
 
 [Code]
+var
+  FFmpegPage: TWizardPage;
+  FFmpegStatusLabel: TLabel;
+  FFmpegInstallButton: TButton;
+  FFmpegSkipButton: TButton;
+  FFmpegFound: Boolean;
+
 // Check if FFmpeg is installed
-function FFmpegInstalled(): Boolean;
+function IsFFmpegInstalled(): Boolean;
 var
   ResultCode: Integer;
 begin
   Result := Exec('cmd.exe', '/c ffmpeg -version', '', SW_HIDE, ewWaitUntilTerminated, ResultCode) and (ResultCode = 0);
 end;
 
-// Show FFmpeg recommendation after installation
+// Check if internet is available
+function IsInternetAvailable(): Boolean;
+var
+  ResultCode: Integer;
+begin
+  Result := Exec('cmd.exe', '/c ping -n 1 github.com', '', SW_HIDE, ewWaitUntilTerminated, ResultCode) and (ResultCode = 0);
+end;
+
+// Initialize wizard
+procedure InitializeWizard();
+begin
+  FFmpegFound := IsFFmpegInstalled();
+end;
+
+// Check dependencies after installation
 procedure CurStepChanged(CurStep: TSetupStep);
+var
+  ResultCode: Integer;
+  Msg: String;
 begin
   if CurStep = ssPostInstall then
   begin
-    if not FFmpegInstalled() then
+    // Check FFmpeg again after installation
+    if not IsFFmpegInstalled() then
     begin
-      MsgBox('FFmpeg is not installed on your system.' + #13#10 + #13#10 +
-             'For best video quality and format support, we recommend installing FFmpeg.' + #13#10 + #13#10 +
-             'Download from: https://ffmpeg.org/download.html', mbInformation, MB_OK);
+      if not WizardIsTaskSelected('installffmpeg') then
+      begin
+        Msg := 'FFmpeg is not installed on your system.' + #13#10 + #13#10 +
+               'FFmpeg is recommended for:' + #13#10 +
+               '  - Best video/audio quality' + #13#10 +
+               '  - Format conversion' + #13#10 +
+               '  - Merging video and audio streams' + #13#10 + #13#10 +
+               'Would you like to install FFmpeg now?' + #13#10 + #13#10 +
+               '(Requires internet connection, ~130 MB download)';
+
+        if MsgBox(Msg, mbConfirmation, MB_YESNO) = IDYES then
+        begin
+          // Run FFmpeg installer
+          if IsInternetAvailable() then
+          begin
+            Exec('powershell.exe',
+                 '-ExecutionPolicy Bypass -File "' + ExpandConstant('{app}') + '\scripts\install_ffmpeg.ps1"',
+                 '', SW_SHOW, ewWaitUntilTerminated, ResultCode);
+
+            if ResultCode = 0 then
+              MsgBox('FFmpeg installed successfully!' + #13#10 + #13#10 +
+                     'You may need to restart the application for changes to take effect.',
+                     mbInformation, MB_OK)
+            else
+              MsgBox('FFmpeg installation failed.' + #13#10 + #13#10 +
+                     'You can install it later from:' + #13#10 +
+                     'Start Menu > YouTube Downloader Pro > Install FFmpeg' + #13#10 + #13#10 +
+                     'Or download manually from: https://ffmpeg.org/download.html',
+                     mbInformation, MB_OK);
+          end
+          else
+          begin
+            MsgBox('No internet connection detected.' + #13#10 + #13#10 +
+                   'You can install FFmpeg later when connected:' + #13#10 +
+                   'Start Menu > YouTube Downloader Pro > Install FFmpeg' + #13#10 + #13#10 +
+                   'Or download manually from: https://ffmpeg.org/download.html',
+                   mbInformation, MB_OK);
+          end;
+        end
+        else
+        begin
+          MsgBox('You can install FFmpeg later from:' + #13#10 +
+                 'Start Menu > YouTube Downloader Pro > Install FFmpeg' + #13#10 + #13#10 +
+                 'The application will work without FFmpeg, but some features ' +
+                 'like format conversion and best quality downloads may be limited.',
+                 mbInformation, MB_OK);
+        end;
+      end;
+    end
+    else
+    begin
+      // FFmpeg is installed
+      if not WizardSilent() then
+      begin
+        MsgBox('FFmpeg detected!' + #13#10 + #13#10 +
+               'Your system is ready for the best video downloading experience.',
+               mbInformation, MB_OK);
+      end;
     end;
   end;
+end;
+
+// Custom pre-install check
+function InitializeSetup(): Boolean;
+begin
+  Result := True;
+end;
+
+// Show warning if FFmpeg not found during task selection
+function ShouldSkipPage(PageID: Integer): Boolean;
+begin
+  Result := False;
 end;
