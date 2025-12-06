@@ -29,7 +29,7 @@ DisableProgramGroupPage=yes
 ; Output settings
 OutputDir=Output
 OutputBaseFilename=YouTubeDownloaderPro-Setup
-SetupIconFile=..\assets\icon.ico
+; SetupIconFile=..\assets\icon.ico  ; Uncomment if you have an icon file
 Compression=lzma2/ultra64
 SolidCompression=yes
 
