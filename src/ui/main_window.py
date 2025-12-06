@@ -64,9 +64,14 @@ class MainWindow:
 
     def _init_managers(self):
         """Initialize manager instances."""
-        # Config manager
+        # Config directory
         config_dir = os.path.expanduser("~/.ytdownloader")
-        self.config_manager = ConfigManager(config_dir)
+        os.makedirs(config_dir, exist_ok=True)
+
+        # Config manager - pass the config FILE path, not directory
+        config_file = os.path.join(config_dir, "config.json")
+        self.config_manager = ConfigManager(config_file)
+        self.config_manager.load()
 
         # Logger
         log_dir = os.path.join(config_dir, "logs")
