@@ -318,6 +318,55 @@ flake8 src/
 - Core modules fully tested
 - Integration tests for main workflows
 
+## Building & Distribution
+
+### Quick Build (CMD/PowerShell)
+```cmd
+# Simple build - creates portable ZIP
+bats\build.bat
+
+# Build with specific version
+bats\build.bat 2.1.0
+```
+
+### Create Windows Installer
+Requires [Inno Setup 6](https://jrsoftware.org/isinfo.php) to be installed.
+```cmd
+# First build the application
+bats\build.bat
+
+# Then create the installer
+bats\build_installer.bat
+```
+
+### Full Release Build
+Professional build with logging, backup, and SHA256 checksum.
+```cmd
+bats\release.bat
+```
+
+### Build Outputs
+
+| Command | Output |
+|---------|--------|
+| `build.bat` | `dist\YouTubeDownloaderPro\` (app folder) |
+| `build.bat` | `dist\YouTubeDownloaderPro-{VERSION}-portable.zip` |
+| `build_installer.bat` | `installer\Output\YouTubeDownloaderPro-Setup.exe` |
+| `release.bat` | `release\YouTubeDownloaderPro_v{VERSION}_{TIMESTAMP}.zip` |
+
+### Shell (Linux/macOS)
+For cross-platform development, you can use PyInstaller directly:
+```bash
+# Install PyInstaller
+pip install pyinstaller
+
+# Build executable
+pyinstaller --onedir --windowed --name "YouTubeDownloaderPro" main.py
+
+# Or single file
+pyinstaller --onefile --windowed --name "YouTubeDownloaderPro" main.py
+```
+
 ## Dependencies
 
 | Package | Purpose |

@@ -22,12 +22,26 @@ Key dependencies: `yt-dlp`, `pillow`, `requests`, `pyinstaller` (for building)
 
 ### Testing
 ```bash
+# Run all tests
 python -m pytest tests/
+
+# Run a single test file
+python -m pytest tests/test_queue_manager.py -v
+
+# Run with coverage
+python -m pytest tests/ --cov=src --cov-report=html
+```
+
+### Code Quality
+```bash
+black src/          # Format code
+flake8 src/         # Lint
+isort src/          # Sort imports
 ```
 
 ### Building Executable
 ```bash
-python build.py
+pyinstaller --onefile --windowed main.py
 ```
 
 ## Architecture (v2.0)
@@ -57,6 +71,10 @@ The application follows a modular architecture with clear separation between cor
 - **error_handler.py**: Centralized error handling
 - **cache.py**: LRU-style caching utilities
 - **file_utils.py**: File operations and filename sanitization
+
+### Authentication (`src/auth/`)
+- **auth_manager.py**: Cookie-based authentication for age-restricted/members-only content, browser cookie import
+- **proxy_manager.py**: HTTP/HTTPS/SOCKS proxy support with connection testing
 
 ### Custom Exceptions (`src/exceptions/`)
 - **errors.py**: `DownloadError`, `NetworkError`, `AuthenticationError`, `ExtractionError`
