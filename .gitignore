@@ -173,3 +173,10 @@ downloads/
 # OS
 .DS_Store
 Thumbs.db
+
+# Build outputs
+release/
+backup/
+logs/
+installer/Output/
+src/version.py
